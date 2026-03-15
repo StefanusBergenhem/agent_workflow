@@ -67,11 +67,14 @@ Each task: build → review → approve → merge to main
 /pipeline
 ```
 
-This starts the orchestrator, which:
-1. Runs `/analyse` to cut a sprint, then pauses for your approval
-2. Computes dependency stages (topological sort of sprint tasks)
-3. For each stage: plans all tasks as a batch, pauses for your approval, then executes all tasks in parallel
-4. Approved tasks merge to main immediately; rejected tasks retry up to 3 times
+This starts the orchestrator, which runs **resume detection first**:
+- If a sprint file exists with incomplete tasks → resumes mid-sprint at the correct phase (skips analyse)
+- If no sprint exists → starts fresh with `/analyse`
+
+After resume detection (or a fresh start):
+1. Computes dependency stages (topological sort of sprint tasks)
+2. For each stage: plans all tasks as a batch, pauses for your approval, then executes all tasks in parallel
+3. Approved tasks merge to main immediately; rejected tasks retry up to 3 times
 
 ### Running phases individually
 
@@ -290,9 +293,9 @@ Or step by step:
 ### Resuming after an interruption
 
 ```
-/status
+/pipeline
 ```
-This tells you where you left off — including which stage you're on, per-task status, and active worktrees. Then run `/pipeline` to resume from the current state.
+The orchestrator automatically detects the in-progress sprint and resumes from the correct phase. Run `/status` first if you want to see where things stand before proceeding.
 
 ### Build was rejected
 

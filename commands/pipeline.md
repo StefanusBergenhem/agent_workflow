@@ -24,7 +24,7 @@ Tasks within a stage run in parallel (separate git worktrees).
 ```
 
 **State transitions:**
-- `idle`: Transition to `analysing`. Run `/analyse`.
+- `idle`: Run resume detection first (see orchestrate skill). If an in-progress sprint exists, skip to `computing_stages` or `planning_stage` as appropriate. Only transition to `analysing` if no sprint file exists or all tasks are complete.
 - `analysing`: Sprint analysis in progress.
 - `awaiting_analyse_approval`: Sprint cut presented. On approval, transition to `computing_stages`.
 - `computing_stages`: Topological sort of tasks into dependency stages. Automatic transition to `planning_stage`.

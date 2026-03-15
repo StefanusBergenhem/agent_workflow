@@ -43,7 +43,7 @@ build → review → APPROVED → merge to main, mark completed
 
 | State | Description | Next Action |
 |:------|:------------|:------------|
-| `idle` | No active work. Pipeline not started. | Transition to `analysing` |
+| `idle` | No active work or pipeline entry point. | Run resume detection: if sprint exists with incomplete tasks, resume mid-sprint. Otherwise transition to `analysing`. |
 | `analysing` | Analyst is cutting the sprint. | Spawn analyse sub-agent |
 | `awaiting_analyse_approval` | Sprint cut presented, waiting for human. | Wait for human gate |
 | `computing_stages` | Computing dependency stages from sprint tasks. | Run stage computation |
@@ -102,6 +102,21 @@ history:
 ---
 
 ## Process
+
+### Resume Detection
+
+**Before acting on any `idle` state**, run resume detection:
+
+1. Check if a sprint file exists at `paths.sprint` (from `config.yaml`).
+2. If the sprint file exists and contains incomplete tasks:
+   - Check if `.workflow/stage_manifest.yaml` exists → if yes, transition directly to `awaiting_stage_approval` (plan was done, stage is ready to execute).
+   - Check if `stages.definitions` is populated in `pipeline_state.yaml` → if yes, transition to `planning_stage`.
+   - Otherwise → transition to `computing_stages` (sprint exists, stages not yet computed).
+   - Update `pipeline_state.yaml` with the new phase and a `reason: "Resumed mid-sprint"` history entry.
+   - **Do NOT re-run analyse.** The sprint is already cut.
+3. If no sprint file exists or all tasks are complete → treat `idle` as a fresh start, transition to `analysing`.
+
+This prevents wiping in-progress sprint state when the pipeline is invoked mid-sprint.
 
 ### Dispatch Protocol
 
