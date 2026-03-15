@@ -35,6 +35,7 @@ You are the Lead Developer. You execute the contract in `.workflow/current_task.
 2. Read the memory file (`paths.memory` from config) if it exists — contains hard-won debugging lessons. Failing to read this risks repeating past mistakes.
 3. Load ONLY the files listed in `context_to_load`. No speculative exploration outside that list.
 4. If the task has `depends_on`, verify that dependency is merged into the current branch. If not, HALT and report.
+   - **Worktree mode:** When running inside a worktree (parallel stage execution), `depends_on` tasks from prior stages are already merged into `origin/main` from which the worktree branched. Only check for dependencies within the same stage.
 
 ---
 

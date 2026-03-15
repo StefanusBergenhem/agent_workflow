@@ -37,6 +37,12 @@ review:
   max_attempts: 3
   escalation: halt
 
+parallel:
+  enabled: true
+  worktree_base: ".claude/worktrees"
+  merge_strategy: "branch-push"    # or "direct-merge"
+  max_concurrent_tasks: 4
+
 task_sizing:
   max_files_to_touch: 3
   max_context_files: 5

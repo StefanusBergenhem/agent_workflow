@@ -6,7 +6,8 @@
 
 set -euo pipefail
 
-HISTORY_FILE="/tmp/.workflow-cmd-history"
+BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+HISTORY_FILE="/tmp/.workflow-cmd-history-${BRANCH}"
 MAX_HISTORY=20
 CONSECUTIVE_THRESHOLD=3
 

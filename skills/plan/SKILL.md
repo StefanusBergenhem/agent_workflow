@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Engineering architect that translates sprint backlog items into precise, agent-executable task contracts with file boundaries and acceptance criteria.
+description: Engineering architect that translates sprint backlog items into precise, agent-executable task contracts with file boundaries and acceptance criteria. Supports batch planning for parallel stage execution.
 ---
 
 # Skill: Engineering Architect — Task Planning
@@ -17,7 +17,8 @@ This skill requires the following inputs, resolved via `config.yaml`:
 
 | Input | Source (config.yaml key) | Purpose |
 |:------|:------------------------|:--------|
-| Sprint | `paths.sprint` | Take the top incomplete item |
+| Sprint | `paths.sprint` | Take task(s) to plan |
+| Pipeline State | `.workflow/pipeline_state.yaml` | Stage definitions and current stage (if in stage mode) |
 | Architecture Docs | `paths.architecture` (list) | Binding decisions, domain model |
 | Conventions | `paths.conventions` (list) | Code style, patterns, project-specific rules |
 | State / Memory | `paths.state`, `paths.memory` | Known issues, past lessons, infrastructure facts |
@@ -25,6 +26,7 @@ This skill requires the following inputs, resolved via `config.yaml`:
 | Workflow Dir | `paths.workflow_dir` (default: `.workflow`) | Where task contracts are written |
 | Preflight Command | `commands.preflight` | Command to run baseline check |
 | Context Map Command | `commands.context_map` (optional) | Command to generate live context map |
+| Parallel Config | `parallel` | Worktree base path, enabled flag |
 
 ---
 
@@ -34,17 +36,20 @@ This skill requires the following inputs, resolved via `config.yaml`:
 
 If `commands.context_map` is defined in config, run it and read the output to understand the current file structure, interfaces, and modules before doing anything else.
 
-### Step 1 — Load Context
+### Step 1 — Load Context and Determine Tasks
 
 Read these files (resolved from config):
-1. Sprint file — take the top incomplete item
-2. Memory file — past lessons; do not repeat past mistakes
-3. State file — current infrastructure facts and deferred items
-4. Architecture docs — do not contradict an existing decision without raising it to the human first
+1. Memory file — past lessons; do not repeat past mistakes
+2. State file — current infrastructure facts and deferred items
+3. Architecture docs — do not contradict an existing decision without raising it to the human first
 
-### Step 2 — Task Sizing
+**Determine which tasks to plan:**
+- **Stage mode** (when `pipeline_state.yaml` has `stages.definitions`): read all tasks assigned to the current stage from `stages.definitions[current].tasks`. Plan all of them as a batch.
+- **Single-task mode** (legacy/fallback): read the sprint file and take the top incomplete item.
 
-Evaluate the backlog item against ALL sizing rules. Split if ANY threshold is exceeded:
+### Step 2 — Task Sizing (per task)
+
+Evaluate each task against ALL sizing rules. Split if ANY threshold is exceeded:
 
 | Rule | Threshold | Action |
 |:-----|:----------|:-------|
@@ -60,26 +65,58 @@ Evaluate the backlog item against ALL sizing rules. Split if ANY threshold is ex
 2. If > 3 files outside `files_to_touch` are affected, mark new fields optional in this task and tighten in a follow-up.
 3. Document the decision (optional vs required) in `implementation_notes`.
 
-When splitting, use sub-IDs: `X.Y.1`, `X.Y.2`. Each sub-task must be independently completable and verifiable.
+When splitting, use sub-IDs: `X.Y.1`, `X.Y.2`. Each sub-task must be independently completable and verifiable. If a split introduces a new dependency within the stage, flag it — the stage may need to be re-computed.
 
 **Architecture gap check:** Before writing the contract, ask: does this task reveal a structural concern (package growing too large, a concept without a home, a missing abstraction)? If yes, raise it to the human before proceeding.
 
 ### Step 3 — Present Task Summary for Approval
 
-Before creating any branch or writing the task contract, present a concise summary to the human:
+Before creating any branch or writing task contracts, present a concise summary to the human.
+
+**In stage mode**, present all tasks in the stage as a batch:
 
 ```
+Stage N of M — N tasks to execute in parallel:
+
 Task: <step_id> — <title>
 What: One-sentence description of the deliverable.
 Why: The user-facing or system-level problem it solves.
 Approach: 2-3 bullet points on implementation strategy and key design choices.
 Scope: Files to touch, estimated size, any splits applied.
 Risks / Open questions: Anything the human should weigh in on (or "None identified").
+
+Task: <step_id> — <title>
+...
+
+Parallel execution plan:
+- Each task will run in its own git worktree
+- Tasks in this stage have no dependencies on each other
+- Approved tasks merge to main immediately
 ```
 
-**Wait for explicit human approval** (e.g., "go", "approved", "yes") before proceeding. If the human requests changes, revise and re-present. Do NOT create the branch or write the contract until approved.
+**In single-task mode**, present one task summary as before.
 
-### Step 4 — Create Feature Branch and Verify Baseline
+**Wait for explicit human approval** (e.g., "go", "approved", "yes") before proceeding. If the human requests changes, revise and re-present. Do NOT create branches or write contracts until approved.
+
+### Step 4 — Create Branches and Verify Baselines
+
+**In stage mode (parallel):**
+
+For each task in the stage, create a git worktree:
+
+```bash
+git fetch origin
+WORKTREE_BASE=$(grep -A1 'worktree_base' config.yaml | tail -1 | tr -d ' "' || echo ".claude/worktrees")
+git worktree add "${WORKTREE_BASE}/<branch-name>" -b <branch-name> origin/main
+```
+
+Derive branch names from task IDs: `<step_id>-<short-description>`, all lowercase, hyphens only.
+
+**Clean tree check:** If the main working tree is not clean when you start, HALT and report — do not create worktrees on top of uncommitted changes.
+
+**Baseline preflight:** Run the preflight command (`commands.preflight` from config) in each worktree. If any fails, HALT for that task — do not hand a broken baseline to the Developer. Report the failure to the human.
+
+**In single-task mode (legacy):**
 
 Derive the branch name from the task: `<step_id>-<short-description>`, all lowercase, hyphens only.
 
@@ -88,13 +125,17 @@ git fetch origin
 git checkout -b <branch-name> origin/main
 ```
 
-**Clean tree check:** If the working tree is not clean when you start, HALT and report — do not create a branch on top of uncommitted changes.
+Run baseline preflight as before.
 
-**Baseline preflight:** Run the preflight command (`commands.preflight` from config) on the fresh branch. If it fails, HALT — do not hand a broken baseline to the Developer. Report the failure to the human.
+### Step 5 — Write Task Contracts
 
-### Step 5 — Write Task Contract
+**In stage mode:**
 
-Generate the task contract at `<workflow_dir>/current_task.yaml`.
+For each task, write the task contract to `<worktree_path>/.workflow/current_task.yaml`. Create the `.workflow/` directory in each worktree if it doesn't exist.
+
+**In single-task mode:**
+
+Write the task contract to `<workflow_dir>/current_task.yaml` as before.
 
 #### Task Contract Schema
 
@@ -163,27 +204,48 @@ implementation_notes: |
 
 5. **Testing specificity:** Every test case must name specific inputs and expected outputs. "Edge cases" alone is not enough. "Happy path" alone is not enough.
 
+### Step 6 — Write Stage Manifest (stage mode only)
+
+After all task contracts are written, create `.workflow/stage_manifest.yaml`:
+
+```yaml
+# .workflow/stage_manifest.yaml
+stage_number: 2
+planned_at: "2026-03-15T10:00:00"
+tasks:
+  - task_id: "1.3"
+    branch: "1.3-add-user-auth"
+    worktree_path: ".claude/worktrees/1.3-add-user-auth"
+    contract_path: ".claude/worktrees/1.3-add-user-auth/.workflow/current_task.yaml"
+  - task_id: "1.4"
+    branch: "1.4-api-rate-limiting"
+    worktree_path: ".claude/worktrees/1.4-api-rate-limiting"
+    contract_path: ".claude/worktrees/1.4-api-rate-limiting/.workflow/current_task.yaml"
+```
+
 ---
 
 ## Output
 
 | Artifact | Location | Description |
 |:---------|:---------|:------------|
-| Task contract | `<workflow_dir>/current_task.yaml` | The machine-executable task contract |
-| Feature branch | git | Clean branch from origin/main with passing baseline |
+| Task contract(s) | `<worktree_path>/.workflow/current_task.yaml` (stage mode) or `<workflow_dir>/current_task.yaml` (single-task mode) | The machine-executable task contract(s) |
+| Feature branch(es) | git worktrees (stage mode) or git branch (single-task mode) | Clean branch(es) from origin/main with passing baseline |
+| Stage manifest | `.workflow/stage_manifest.yaml` (stage mode only) | Index of all worktrees and contracts for the stage |
 
 ---
 
 ## Hard Constraints
 
-- **Clean tree required.** Never create a branch on uncommitted changes.
+- **Clean tree required.** Never create a branch or worktree on uncommitted changes.
 - **Baseline must pass.** Never hand a broken baseline to the Developer.
 - **Max 5 context files.** Split if exceeded.
 - **Max 3 files to touch.** Split if exceeded.
 - **Max 150 lines estimated.** Split if exceeded.
-- **Human approval required.** Never create the branch or write the contract without explicit approval.
+- **Human approval required.** Never create branches/worktrees or write contracts without explicit approval.
 - **No code.** This skill never writes implementation code. It produces contracts only.
 - **No contradicting ADRs.** If a task would violate an architectural decision, raise it to the human first.
+- **Stage independence.** In stage mode, tasks within a stage must have no dependencies on each other. If a split introduces an intra-stage dependency, flag it for re-computation.
 
 ---
 
@@ -191,8 +253,10 @@ implementation_notes: |
 
 Stop and report to the human if:
 - The working tree is not clean
-- Baseline preflight fails on a fresh branch
+- Baseline preflight fails on a fresh branch/worktree
 - A task requires more context than the 5-file limit allows (split required)
 - A task implies a design decision not yet recorded in architecture docs
 - The sprint file has no incomplete items
-- A dependency declared in the sprint has not been merged yet
+- A dependency declared in the sprint has not been merged yet (for single-task mode)
+- A worktree cannot be created (disk space, git error, path conflict)
+- A task split introduces an intra-stage dependency (stage must be re-computed)
