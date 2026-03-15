@@ -1,4 +1,5 @@
 ---
+name: pipeline
 description: "Run the full pipeline — orchestrate analyse/plan/build/review in a loop"
 ---
 

@@ -1,4 +1,5 @@
 ---
+name: status
 description: "Report current pipeline status — phase, active task, attempt count, blockers"
 ---
 

@@ -1,3 +1,9 @@
+---
+name: root-cause-tracing
+description: Cross-cutting 4-phase debugging protocol (observe, hypothesise, test, fix). Activates when diagnosing failures to eliminate guess-and-check debugging.
+user-invocable: false
+---
+
 # Root Cause Tracing — 4-Phase Debugging Protocol
 
 ## Purpose

@@ -1,4 +1,5 @@
 ---
+name: init
 description: "Bootstrap .workflow/ in a new project — detect framework, create config, set up structure"
 ---
 

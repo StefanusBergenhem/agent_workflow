@@ -1,4 +1,5 @@
 ---
+name: analyse
 description: "Run the analyse phase — cut a sprint from the backlog"
 ---
 

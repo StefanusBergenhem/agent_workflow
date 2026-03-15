@@ -1,3 +1,9 @@
+---
+name: verification
+description: Cross-cutting evidence-based completion checking. Ensures every claim of done is backed by fresh, verifiable evidence — not assumptions or cached results.
+user-invocable: false
+---
+
 # Verification — Evidence-Based Completion Checking
 
 ## Purpose

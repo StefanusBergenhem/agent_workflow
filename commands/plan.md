@@ -1,4 +1,5 @@
 ---
+name: plan
 description: "Run the plan phase — produce an agent-executable task contract from the sprint backlog"
 ---
 

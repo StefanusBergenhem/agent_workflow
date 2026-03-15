@@ -1,3 +1,9 @@
+---
+name: scope-guard
+description: Cross-cutting file boundary enforcement. Ensures the agent only modifies files listed in files_to_touch and reads files listed in context_to_load from the task contract.
+user-invocable: false
+---
+
 # Scope Guard — File Boundary Enforcement
 
 ## Purpose

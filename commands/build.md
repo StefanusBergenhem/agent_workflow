@@ -1,4 +1,5 @@
 ---
+name: build
 description: "Run the build phase — execute the current task contract using TDD"
 ---
 

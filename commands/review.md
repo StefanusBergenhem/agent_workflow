@@ -1,4 +1,5 @@
 ---
+name: review
 description: "Run the review phase — validate the build against the task contract"
 ---
 

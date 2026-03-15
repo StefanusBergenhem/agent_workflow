@@ -1,3 +1,9 @@
+---
+name: receiving-feedback
+description: Cross-cutting protocol for processing review rejections. Activates when feedback.yaml is present or a review returns REJECT. Enforces surgical fixes and escalation after 3 failed attempts.
+user-invocable: false
+---
+
 # Receiving Feedback — How to Process Review Rejection
 
 ## Purpose
