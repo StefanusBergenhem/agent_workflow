@@ -1,0 +1,43 @@
+# .workflow/config.yaml — Project workflow configuration
+# Copy this file to .workflow/config.yaml and fill in your project details.
+# Template variables ({{VAR}}) must be replaced with actual values.
+
+version: 1
+
+project:
+  name: "{{PROJECT_NAME}}"
+  language: "{{LANGUAGE}}"
+
+paths:
+  roadmap: "docs/ROADMAP.md"
+  sprint: "docs/SPRINT.md"
+  state: "docs/STATE.md"
+  memory: "docs/MEMORY.md"
+  architecture: "docs/ARCHITECTURE.md"
+  conventions: "docs/CONVENTIONS.md"
+
+commands:
+  test_unit: "{{TEST_UNIT_CMD}}"
+  test_integration: "{{TEST_INTEGRATION_CMD}}"
+  test_e2e: "{{TEST_E2E_CMD}}"
+  lint: "{{LINT_CMD}}"
+  type_check: "{{TYPE_CHECK_CMD}}"
+  compile_check: "{{COMPILE_CHECK_CMD}}"
+  preflight: "{{PREFLIGHT_CMD}}"
+  context_map: "{{CONTEXT_MAP_CMD}}"
+
+pipeline:
+  phases:
+    - { name: analyse, skill: analyse, gate: approval, required: true }
+    - { name: plan, skill: plan, gate: approval, required: true }
+    - { name: build, skill: build, gate: auto, required: true }
+    - { name: review, skill: review, gate: auto, required: true }
+
+review:
+  max_attempts: 3
+  escalation: halt
+
+task_sizing:
+  max_files_to_touch: 3
+  max_context_files: 5
+  max_estimated_lines: 150

@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "hooks/retry-loop-detector.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "hooks/post-build-scope-audit.sh",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "hooks/post-build-suppression-scan.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

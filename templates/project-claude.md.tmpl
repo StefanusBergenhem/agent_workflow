@@ -1,0 +1,95 @@
+# {{PROJECT_NAME}}
+
+{{PROJECT_DESCRIPTION}}
+
+---
+
+## Workflow Integration
+
+This project uses the Claude Code Workflow system for structured, agent-driven development.
+
+### Pipeline Phases
+
+All work follows the pipeline: **analyse -> plan -> build -> review**.
+
+- Use `/proj-analyse` to begin analysing a task from the roadmap.
+- Use `/proj-plan` to generate a task contract with file boundaries and testing mandates.
+- Use `/proj-build` to execute the task contract with TDD enforcement.
+- Use `/proj-review` to run automated review and quality gates.
+
+### State Directory
+
+The `.workflow/` directory contains all workflow state:
+
+- `.workflow/config.yaml` — Project configuration (commands, paths, pipeline).
+- `.workflow/current_task.yaml` — Active task contract (scope, files, tests).
+- `.workflow/review_ready.yaml` — Build completion evidence (TDD, preflight results).
+
+**Do not edit workflow state files manually** unless you understand the implications.
+
+---
+
+## Project Structure
+
+<!-- Describe your project's directory layout here -->
+
+```
+{{PROJECT_STRUCTURE}}
+```
+
+---
+
+## Testing
+
+### Commands
+
+- **Unit tests:** `{{TEST_UNIT_CMD}}`
+- **Integration tests:** `{{TEST_INTEGRATION_CMD}}`
+- **End-to-end tests:** `{{TEST_E2E_CMD}}`
+- **Lint:** `{{LINT_CMD}}`
+- **Type check:** `{{TYPE_CHECK_CMD}}`
+- **Preflight (all checks):** `{{PREFLIGHT_CMD}}`
+
+### Testing Standards
+
+- All new code must have tests written BEFORE implementation (TDD: red -> green -> refactor).
+- Unit tests use no external dependencies (no DB, no network, no filesystem).
+- Integration tests use real dependencies and are tagged appropriately.
+- Every `if/else`, `switch`, and error path must have a dedicated test case.
+- Happy-path-only coverage is insufficient.
+
+---
+
+## Conventions
+
+### Code Style
+
+<!-- Define your project's code style rules here -->
+
+- {{LANGUAGE_CONVENTIONS}}
+
+### Commit Messages
+
+<!-- Define your commit message format here -->
+
+### Branch Naming
+
+<!-- Define your branch naming convention here -->
+
+---
+
+## Architecture
+
+<!-- High-level architecture description or link to docs/ARCHITECTURE.md -->
+
+See `docs/ARCHITECTURE.md` for detailed architecture documentation.
+
+---
+
+## Key Documentation
+
+- `docs/ROADMAP.md` — Feature roadmap and task backlog.
+- `docs/SPRINT.md` — Current sprint goals and progress.
+- `docs/STATE.md` — System state and status tracking.
+- `docs/MEMORY.md` — Hard-won lessons and debugging notes.
+- `docs/CONVENTIONS.md` — Detailed coding conventions.
