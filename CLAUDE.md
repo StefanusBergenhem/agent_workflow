@@ -55,3 +55,5 @@ When reviewing or extending the plan, your posture depends on what is needed:
 - **SCOPE REDUCTION**: Surgeon. Find the minimum viable version. Cut everything else. Be ruthless.
 
 Once a mode is selected, COMMIT to it. Do not silently drift. Raise concerns once, then execute faithfully.
+
+Every time there is a update that impacts workflow. update `docs/WORKFLOW.md`.
