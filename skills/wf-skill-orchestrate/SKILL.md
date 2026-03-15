@@ -1,5 +1,5 @@
 ---
-name: orchestrate
+name: wf-skill-orchestrate
 description: Pipeline controller state machine that manages analyse-plan-build-review phase transitions with stage-based parallelism, dispatches sub-agents, and enforces gate conditions.
 ---
 
@@ -148,20 +148,20 @@ For every state transition that requires a sub-agent:
 
 #### Analyse Phase
 Sub-agent receives:
-- `skills/analyse/SKILL.md`
+- `skills/wf-skill-analyse/SKILL.md`
 - `config.yaml`
 - Files at: `paths.roadmap`, `paths.state`, `paths.sprint`, `paths.architecture`, `paths.codebase`
 
 #### Plan Phase (Stage Mode)
 Sub-agent receives:
-- `skills/plan/SKILL.md`
+- `skills/wf-skill-plan/SKILL.md`
 - `config.yaml`
 - `.workflow/pipeline_state.yaml` (for `stages.definitions[current].tasks`)
 - Files at: `paths.sprint`, `paths.state`, `paths.memory`, `paths.architecture`, `paths.conventions`, `paths.codebase`
 
 #### Build Phase (per-task, in worktree)
 Sub-agent receives:
-- `skills/build/SKILL.md`
+- `skills/wf-skill-build/SKILL.md`
 - `config.yaml`
 - `<worktree_path>/.workflow/current_task.yaml`
 - `<worktree_path>/.workflow/feedback.yaml` (if exists — Fix Mode)
@@ -170,7 +170,7 @@ Sub-agent receives:
 
 #### Review Phase (per-task, in worktree)
 Sub-agent receives:
-- `skills/review/SKILL.md`
+- `skills/wf-skill-review/SKILL.md`
 - `config.yaml`
 - `<worktree_path>/.workflow/current_task.yaml`
 - `<worktree_path>/.workflow/review_ready.yaml`

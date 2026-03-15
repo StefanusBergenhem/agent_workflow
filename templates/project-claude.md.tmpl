@@ -12,10 +12,10 @@ This project uses the Claude Code Workflow system for structured, agent-driven d
 
 All work follows the pipeline: **analyse -> plan -> build -> review**.
 
-- Use `/proj-analyse` to begin analysing a task from the roadmap.
-- Use `/proj-plan` to generate a task contract with file boundaries and testing mandates.
-- Use `/proj-build` to execute the task contract with TDD enforcement.
-- Use `/proj-review` to run automated review and quality gates.
+- Use `/wf-command-analyse` to begin analysing a task from the roadmap.
+- Use `/wf-command-plan` to generate a task contract with file boundaries and testing mandates.
+- Use `/wf-command-build` to execute the task contract with TDD enforcement.
+- Use `/wf-command-review` to run automated review and quality gates.
 
 ### State Directory
 
@@ -23,7 +23,7 @@ The `.workflow/` directory contains all workflow state:
 
 - `.workflow/config.yaml` — Project configuration (commands, paths, pipeline).
 - `.workflow/current_task.yaml` — Active task contract (scope, files, tests).
-- `.workflow/review_ready.yaml` — Build completion evidence (TDD, preflight results).
+- `.workflow/wf-command-review_ready.yaml` — Build completion evidence (TDD, preflight results).
 
 **Do not edit workflow state files manually** unless you understand the implications.
 

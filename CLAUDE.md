@@ -6,19 +6,19 @@ A portable, project-agnostic skills framework for Claude Code. Each pipeline pha
 
 ```
 skills/              # Cognitive modes — each has a SKILL.md
-  analyse/           # Strategic analyst (sprint cutting)
-  plan/              # Engineering architect (task contracts)
-  build/             # Disciplined developer (TDD execution)
-  review/            # QA gatekeeper (adversarial review)
-  orchestrate/       # Pipeline controller (state machine)
-  scope-guard/       # Cross-cutting: file boundary enforcement
-  root-cause-tracing/  # Cross-cutting: 4-phase debugging
-  verification/      # Cross-cutting: evidence-based completion
-  receiving-feedback/  # Cross-cutting: processing rejections
-  testing-anti-patterns/  # Cross-cutting: test quality rules
+  wf-skill-analyse/           # Strategic analyst (sprint cutting)
+  wf-skill-plan/              # Engineering architect (task contracts)
+  wf-skill-build/             # Disciplined developer (TDD execution)
+  wf-skill-review/            # QA gatekeeper (adversarial review)
+  wf-skill-orchestrate/       # Pipeline controller (state machine)
+  wf-skill-scope-guard/       # Cross-cutting: file boundary enforcement
+  wf-skill-root-cause-tracing/  # Cross-cutting: 4-phase debugging
+  wf-skill-verification/      # Cross-cutting: evidence-based completion
+  wf-skill-receiving-feedback/  # Cross-cutting: processing rejections
+  wf-skill-testing-anti-patterns/  # Cross-cutting: test quality rules
 
 commands/            # Slash commands (thin wrappers invoking skills)
-  analyse.md, plan.md, build.md, review.md, pipeline.md, status.md, init.md
+  wf-command-analyse.md, wf-command-plan.md, wf-command-build.md, wf-command-review.md, wf-command-pipeline.md, wf-command-status.md, wf-command-init.md
   proj-*.md          # Legacy DEMS-specific commands (kept for compat)
 
 hooks/               # Mechanical enforcement (shell scripts)
@@ -43,7 +43,7 @@ workflow/            # Legacy DEMS workflow docs (kept for reference)
 ## Testing Changes
 
 - **Hook scripts**: Test against known-good and known-bad git diffs. Each hook should pass cleanly on compliant changes and exit 2 with a clear message on violations.
-- **Skills**: Dry-run on a real project via `/init` then `/pipeline`. Verify sub-agents receive only their mandated context.
+- **Skills**: Dry-run on a real project via `/wf-command-init` then `/wf-command-pipeline`. Verify sub-agents receive only their mandated context.
 - **Install script**: Run `./install.sh` — it's idempotent (safe to re-run).
 
 ## Collaboration Posture

@@ -1,5 +1,5 @@
 ---
-name: status
+name: wf-command-status
 description: "Report current pipeline status — phase, active task, attempt count, blockers"
 ---
 
@@ -27,4 +27,4 @@ Report the following in a clear, structured format:
 - **Worktree locations:** Active worktrees and their branches (if parallel execution is active)
 - **Next step:** what command to run next
 
-If no `.workflow/` directory exists, report that the project has not been initialized and suggest running `/init`.
+If no `.workflow/` directory exists, report that the project has not been initialized and suggest running `/wf-command-init`.

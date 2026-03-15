@@ -29,6 +29,16 @@ echo "  Created: $COMMANDS_DIR"
 # -------------------------------------------------------
 echo ""
 echo "[2/6] Linking skills..."
+
+# Remove stale symlinks for old skill names
+for stale_skill in analyse plan build review orchestrate scope-guard root-cause-tracing verification receiving-feedback testing-anti-patterns; do
+    stale_target="$SKILLS_DIR/$stale_skill"
+    if [ -L "$stale_target" ]; then
+        rm "$stale_target"
+        echo "  Removed stale symlink: $stale_skill"
+    fi
+done
+
 for skill_dir in "$SCRIPT_DIR"/skills/*/; do
     skill_name="$(basename "$skill_dir")"
     target="$SKILLS_DIR/$skill_name"
@@ -47,6 +57,16 @@ done
 # -------------------------------------------------------
 echo ""
 echo "[3/6] Linking commands..."
+
+# Remove stale symlinks for old command filenames
+for stale_cmd in analyse.md plan.md build.md review.md init.md status.md pipeline.md; do
+    stale_target="$COMMANDS_DIR/$stale_cmd"
+    if [ -L "$stale_target" ]; then
+        rm "$stale_target"
+        echo "  Removed stale symlink: $stale_cmd"
+    fi
+done
+
 for cmd_file in "$SCRIPT_DIR"/commands/*.md; do
     cmd_name="$(basename "$cmd_file")"
     # Skip legacy project-specific commands (proj-*.md)
@@ -169,9 +189,9 @@ echo "=== Installation Complete ==="
 echo ""
 echo "Next steps:"
 echo "  1. Review ~/.claude/CLAUDE.md to confirm global rules"
-echo "  2. In your project, run the /init command to bootstrap .workflow/"
+echo "  2. In your project, run the /wf-command-init command to bootstrap .workflow/"
 echo "  3. Create your roadmap and sprint docs"
-echo "  4. Run /analyse to cut your first sprint"
+echo "  4. Run /wf-command-analyse to cut your first sprint"
 echo ""
 echo "Installed components:"
 echo "  Skills:   $SKILLS_DIR/"

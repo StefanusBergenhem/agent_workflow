@@ -28,10 +28,10 @@ commands:
 
 pipeline:
   phases:
-    - { name: analyse, skill: analyse, gate: approval, required: true }
-    - { name: plan, skill: plan, gate: approval, required: true }
-    - { name: build, skill: build, gate: auto, required: true }
-    - { name: review, skill: review, gate: auto, required: true }
+    - { name: analyse, skill: wf-skill-analyse, gate: approval, required: true }
+    - { name: plan, skill: wf-skill-plan, gate: approval, required: true }
+    - { name: build, skill: wf-skill-build, gate: auto, required: true }
+    - { name: review, skill: wf-skill-review, gate: auto, required: true }
 
 review:
   max_attempts: 3

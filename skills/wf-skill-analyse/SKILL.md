@@ -1,5 +1,5 @@
 ---
-name: analyse
+name: wf-skill-analyse
 description: Strategic analyst for sprint cutting. Activates when reading a project roadmap to produce a sprint backlog with prioritised, dependency-ordered tasks.
 ---
 

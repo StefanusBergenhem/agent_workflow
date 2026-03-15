@@ -1,5 +1,5 @@
 ---
-name: root-cause-tracing
+name: wf-skill-root-cause-tracing
 description: Cross-cutting 4-phase debugging protocol (observe, hypothesise, test, fix). Activates when diagnosing failures to eliminate guess-and-check debugging.
 user-invocable: false
 ---

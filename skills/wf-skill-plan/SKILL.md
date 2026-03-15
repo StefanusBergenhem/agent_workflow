@@ -1,5 +1,5 @@
 ---
-name: plan
+name: wf-skill-plan
 description: Engineering architect that translates sprint backlog items into precise, agent-executable task contracts with file boundaries and acceptance criteria. Supports batch planning for parallel stage execution.
 ---
 

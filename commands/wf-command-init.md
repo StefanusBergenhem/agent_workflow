@@ -1,5 +1,5 @@
 ---
-name: init
+name: wf-command-init
 description: "Bootstrap .workflow/ in a new project — detect framework, create config, set up structure"
 ---
 
@@ -84,4 +84,4 @@ Create `.claude/skills/` for per-project skill overrides. Project-level skills t
 Print a summary of what was created and detected. Suggest next steps:
 - Review and customize `.workflow/config.yaml`
 - Create roadmap/sprint/state docs if they do not exist
-- Run `/analyse` to cut the first sprint
+- Run `/wf-command-analyse` to cut the first sprint

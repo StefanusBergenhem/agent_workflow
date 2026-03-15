@@ -1,5 +1,5 @@
 ---
-name: pipeline
+name: wf-command-pipeline
 description: "Run the full pipeline — orchestrate analyse/plan/build/review in a loop"
 ---
 
@@ -7,7 +7,7 @@ Load and execute the orchestrate skill.
 
 1. Read `.workflow/config.yaml` for project paths and settings
 2. Read `.workflow/pipeline_state.yaml` to determine current phase
-3. Follow the instructions in the `orchestrate` skill (skills/orchestrate/SKILL.md)
+3. Follow the instructions in the `orchestrate` skill (skills/wf-skill-orchestrate/SKILL.md)
 4. Execute the pipeline state machine:
 
 ```

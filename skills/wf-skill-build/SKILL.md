@@ -1,5 +1,5 @@
 ---
-name: build
+name: wf-skill-build
 description: Disciplined developer that executes task contracts using TDD (red-green-refactor). Activates when a current_task.yaml exists and the pipeline is in the build phase.
 ---
 

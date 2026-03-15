@@ -1,5 +1,5 @@
 ---
-name: testing-anti-patterns
+name: wf-skill-testing-anti-patterns
 description: Cross-cutting test quality rules cataloguing common testing mistakes. Referenced during build and review phases to prevent misleading, brittle, or worthless tests.
 user-invocable: false
 ---

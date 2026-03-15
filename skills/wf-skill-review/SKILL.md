@@ -1,5 +1,5 @@
 ---
-name: review
+name: wf-skill-review
 description: Adversarial QA gatekeeper that validates developer work against the task contract. Produces APPROVED or REJECTED verdict with actionable feedback.
 ---
 

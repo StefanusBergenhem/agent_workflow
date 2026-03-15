@@ -20,7 +20,7 @@ This symlinks skills and commands into `~/.claude/`, installs hooks into `~/.cla
 In any project directory:
 
 ```
-/init
+/wf-command-init
 ```
 
 This creates:
@@ -49,7 +49,7 @@ The workflow expects these files to exist (paths configurable in `config.yaml`):
 The pipeline uses **stage-based parallelism**: tasks are grouped into dependency stages via topological sort, tasks within a stage run in parallel (in separate git worktrees), and stages execute serially.
 
 ```
-/analyse → approve sprint → compute stages →
+/wf-command-analyse → approve sprint → compute stages →
   plan stage → approve stage → execute stage (parallel builds + reviews) →
     [more stages?] → plan next stage →
     [all done?] → idle
@@ -64,12 +64,12 @@ Each task: build → review → approve → merge to main
 ### Running the full pipeline
 
 ```
-/pipeline
+/wf-command-pipeline
 ```
 
 This starts the orchestrator, which runs **resume detection first**:
 - If a sprint file exists with incomplete tasks → resumes mid-sprint at the correct phase (skips analyse)
-- If no sprint exists → starts fresh with `/analyse`
+- If no sprint exists → starts fresh with `/wf-command-analyse`
 
 After resume detection (or a fresh start):
 1. Computes dependency stages (topological sort of sprint tasks)
@@ -81,10 +81,10 @@ After resume detection (or a fresh start):
 You can also run each phase manually:
 
 ```
-/analyse    # Cut a sprint from the backlog
-/plan       # Create task contracts for the current stage
-/build      # Execute a task contract (TDD)
-/review     # Validate the build against the contract
+/wf-command-analyse    # Cut a sprint from the backlog
+/wf-command-plan       # Create task contracts for the current stage
+/wf-command-build      # Execute a task contract (TDD)
+/wf-command-review     # Validate the build against the contract
 ```
 
 This is useful when you want more control, or when resuming after an interruption.
@@ -92,7 +92,7 @@ This is useful when you want more control, or when resuming after an interruptio
 ### Checking status
 
 ```
-/status
+/wf-command-status
 ```
 
 Reports: current phase, stage progress (N of M), per-task status within the active stage (building/reviewing/completed/escalated), blocked tasks, worktree locations, and next action.
@@ -101,7 +101,7 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 
 ## Phase Details
 
-### /analyse — Sprint Cutting
+### /wf-command-analyse — Sprint Cutting
 
 **What it does:** Reads your roadmap and current state, then proposes a sprint cut — a set of sized, ordered, dependency-aware tasks.
 
@@ -115,7 +115,7 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 
 **Output:** Sprint written to your sprint file.
 
-### /plan — Task Contracts (Stage Mode)
+### /wf-command-plan — Task Contracts (Stage Mode)
 
 **What it does:** Takes all tasks in the current dependency stage and produces task contracts for each — files to touch, files to read for context, acceptance criteria, and a testing mandate. Creates one git worktree per task.
 
@@ -131,7 +131,7 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 
 **Output:** `.workflow/stage_manifest.yaml` (listing all worktrees and contracts) + one `.workflow/current_task.yaml` per worktree + feature branches created.
 
-### /build — TDD Execution
+### /wf-command-build — TDD Execution
 
 **What it does:** Executes the task contract using strict TDD:
 1. Writes tests first, confirms they FAIL (red phase)
@@ -147,7 +147,7 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 
 **Output:** Code changes + `<worktree>/.workflow/review_ready.yaml`.
 
-### /review — QA Validation
+### /wf-command-review — QA Validation
 
 **What it does:** Adversarial review of the build against the contract. Checks (in priority order):
 
@@ -191,12 +191,12 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 
 | File | Written by | Read by | Purpose |
 |:-----|:-----------|:--------|:--------|
-| `config.yaml` | `/init` (you edit) | All phases | Project config — paths, commands, limits, parallel settings |
+| `config.yaml` | `/wf-command-init` (you edit) | All phases | Project config — paths, commands, limits, parallel settings |
 | `pipeline_state.yaml` | Orchestrator | Orchestrator | Current phase, stages, per-task states, blocked tasks, history |
-| `stage_manifest.yaml` | `/plan` | Orchestrator, `/build` | Active stage: worktree paths, branches, task contracts |
-| `current_task.yaml` | `/plan` (per worktree) | `/build`, `/review` | The task contract — scope, tests, criteria |
-| `review_ready.yaml` | `/build` (per worktree) | `/review` | Build completion claim with TDD evidence |
-| `feedback.yaml` | `/review` (per worktree) | `/build` (fix mode) | Rejection details with required fixes |
+| `stage_manifest.yaml` | `/wf-command-plan` | Orchestrator, `/wf-command-build` | Active stage: worktree paths, branches, task contracts |
+| `current_task.yaml` | `/wf-command-plan` (per worktree) | `/wf-command-build`, `/wf-command-review` | The task contract — scope, tests, criteria |
+| `review_ready.yaml` | `/wf-command-build` (per worktree) | `/wf-command-review` | Build completion claim with TDD evidence |
+| `feedback.yaml` | `/wf-command-review` (per worktree) | `/wf-command-build` (fix mode) | Rejection details with required fixes |
 
 ### Pipeline lifecycle
 
@@ -267,10 +267,10 @@ When a task is escalated (3 failed attempts):
 Any skill can be overridden per-project by creating a matching file:
 
 ```
-your-project/.claude/skills/build/SKILL.md
+your-project/.claude/skills/wf-skill-build/SKILL.md
 ```
 
-This overrides the global `~/.claude/skills/build/SKILL.md` for this project only. Useful for project-specific test commands, conventions, or workflow tweaks.
+This overrides the global `~/.claude/skills/wf-skill-build/SKILL.md` for this project only. Useful for project-specific test commands, conventions, or workflow tweaks.
 
 **Resolution order:** Project `.claude/skills/` → Global `~/.claude/skills/` → Error
 
@@ -281,10 +281,10 @@ This overrides the global `~/.claude/skills/build/SKILL.md` for this project onl
 ### Starting a new sprint
 
 ```
-/pipeline
+/wf-command-pipeline
 ```
 Or step by step:
-1. `/analyse` — review the sprint cut, approve it
+1. `/wf-command-analyse` — review the sprint cut, approve it
 2. The orchestrator computes dependency stages automatically
 3. For each stage: review the batch of task contracts, approve them
 4. Tasks build and review in parallel. Approved tasks merge to main.
@@ -293,9 +293,9 @@ Or step by step:
 ### Resuming after an interruption
 
 ```
-/pipeline
+/wf-command-pipeline
 ```
-The orchestrator automatically detects the in-progress sprint and resumes from the correct phase. Run `/status` first if you want to see where things stand before proceeding.
+The orchestrator automatically detects the in-progress sprint and resumes from the correct phase. Run `/wf-command-status` first if you want to see where things stand before proceeding.
 
 ### Build was rejected
 
@@ -316,22 +316,22 @@ The merge is aborted and escalated to you. You'll see which files conflict and w
 
 ```
 cd /path/to/new-project
-/init
+/wf-command-init
 ```
 Then edit `.workflow/config.yaml` — especially the `parallel` section for worktree settings.
 
 ### Skipping a phase
 
 You can run phases out of order if needed. Just make sure the required state files exist:
-- `/build` needs `current_task.yaml` (in the worktree)
-- `/review` needs `current_task.yaml` + `review_ready.yaml` (in the worktree)
+- `/wf-command-build` needs `current_task.yaml` (in the worktree)
+- `/wf-command-review` needs `current_task.yaml` + `review_ready.yaml` (in the worktree)
 
 ---
 
 ## Troubleshooting
 
 ### "No config.yaml found"
-Run `/init` first to bootstrap the project.
+Run `/wf-command-init` first to bootstrap the project.
 
 ### Hook keeps blocking edits
 Check which hook is firing from the error message. If it's the scope audit, you may need to update `files_to_touch` in the task contract. If it's the suppression scan, fix the underlying lint issue instead of suppressing it.
@@ -340,7 +340,7 @@ Check which hook is firing from the error message. If it's the scope audit, you 
 Claude is in a retry loop. The root-cause-tracing skill will be invoked. If you want to override, clear `/tmp/.workflow-cmd-history`.
 
 ### Pipeline state is corrupted
-Delete `.workflow/pipeline_state.yaml` and run `/status` — it will be recreated with `idle` state.
+Delete `.workflow/pipeline_state.yaml` and run `/wf-command-status` — it will be recreated with `idle` state.
 
 ### Orphaned worktrees after interruption
 Run `git worktree list` to see active worktrees. Remove any under the configured `parallel.worktree_base` that don't correspond to active tasks:
@@ -352,7 +352,7 @@ git worktree remove <path> --force
 The orchestrator aborts the merge and escalates. Resolve the conflict manually in the worktree, then push. The pipeline will detect the resolution.
 
 ### All tasks in a stage are blocked
-If every task in remaining stages depends on an escalated task, the pipeline transitions to `idle` and reports what's blocked. Resolve the escalated task first, then re-run `/pipeline`.
+If every task in remaining stages depends on an escalated task, the pipeline transitions to `idle` and reports what's blocked. Resolve the escalated task first, then re-run `/wf-command-pipeline`.
 
 ### Want to start fresh on a task
 Delete the task's worktree (`git worktree remove <path>`), clear its entry from `pipeline_state.yaml` task_states, and re-plan.
