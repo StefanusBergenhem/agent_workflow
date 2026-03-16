@@ -51,7 +51,7 @@ Read in this exact order:
 
 ### Step 2 — QA Checklist
 
-Execute the checklist in priority order. Stop at the first P0 failure — do not continue checking lower priorities if a P0 fails.
+Execute the checklist in priority order. Stop at the first P0 failure — do not continue checking lower priorities if a P0 fails. **Announce each priority level** as you begin it: "Checking P0 — Critical checks", "Checking P1 — Test quality", etc.
 
 #### P0 — Critical (any failure = immediate REJECT)
 

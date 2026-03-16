@@ -243,7 +243,7 @@ Each test must set up its own state, execute, and tear down independently. Use `
 
 ---
 
-## Anti-Pattern 8: Ignoring Error Paths
+## Anti-Pattern 8: Only Testing the Happy Path
 
 ### What it looks like
 ```python
@@ -251,88 +251,35 @@ Each test must set up its own state, execute, and tear down independently. Use `
 def test_transfer_money():
     result = transfer(from_account=a, to_account=b, amount=100)
     assert result.success is True
-# No tests for: insufficient funds, invalid account, negative amount,
-# same source and destination, concurrent transfers, network failure...
+# No tests for: insufficient funds, invalid account, negative amount...
 ```
 
 ### Why it's bad
-Happy paths rarely break. Error paths break constantly — and they're where the worst bugs live (data corruption, security holes, silent failures). A test suite with only happy-path tests provides a false sense of coverage.
+Happy paths rarely break. Error paths and boundary conditions are where the worst bugs live. A test suite with only happy-path tests provides a false sense of coverage.
 
 ### Correct approach
 ```python
-# GOOD: Test error paths explicitly
+# GOOD: Test error paths and boundaries explicitly
 def test_transfer_succeeds_with_sufficient_funds():
     result = transfer(from_account=a, to_account=b, amount=100)
     assert result.success is True
     assert a.balance == 900
-    assert b.balance == 1100
 
 def test_transfer_fails_with_insufficient_funds():
     result = transfer(from_account=a, to_account=b, amount=99999)
     assert result.success is False
-    assert result.error == "Insufficient funds"
     assert a.balance == 1000  # unchanged
-    assert b.balance == 1000  # unchanged
 
 def test_transfer_rejects_negative_amount():
     with pytest.raises(ValueError, match="Amount must be positive"):
         transfer(from_account=a, to_account=b, amount=-50)
-
-def test_transfer_rejects_same_account():
-    with pytest.raises(ValueError, match="Cannot transfer to same account"):
-        transfer(from_account=a, to_account=a, amount=100)
 ```
 
-For every feature, ask: "How can this fail? What invalid inputs are possible? What error should the user see?" Test those.
+For every feature, ask: "How can this fail? What invalid inputs are possible? What boundary conditions exist?" Test those.
 
 ---
 
-## Anti-Pattern 9: Only Testing the Happy Path
-
-### What it looks like
-This is closely related to Anti-Pattern 8 but focuses on missing boundary conditions:
-
-```python
-# BAD: Testing one "normal" case
-def test_paginate():
-    result = paginate(items=range(100), page=2, per_page=10)
-    assert len(result) == 10
-```
-
-### Why it's bad
-What about page 0? Page -1? Page 9999? `per_page=0`? An empty items list? A list with exactly `per_page` items? These boundaries are where bugs hide.
-
-### Correct approach
-```python
-# GOOD: Test boundaries and edge cases
-def test_paginate_returns_correct_page():
-    result = paginate(items=range(100), page=2, per_page=10)
-    assert result == list(range(10, 20))
-
-def test_paginate_first_page():
-    result = paginate(items=range(100), page=1, per_page=10)
-    assert result == list(range(0, 10))
-
-def test_paginate_last_page_partial():
-    result = paginate(items=range(25), page=3, per_page=10)
-    assert result == [20, 21, 22, 23, 24]
-
-def test_paginate_empty_list():
-    result = paginate(items=[], page=1, per_page=10)
-    assert result == []
-
-def test_paginate_beyond_last_page():
-    result = paginate(items=range(10), page=5, per_page=10)
-    assert result == []
-
-def test_paginate_rejects_zero_per_page():
-    with pytest.raises(ValueError):
-        paginate(items=range(10), page=1, per_page=0)
-```
-
----
-
-## Anti-Pattern 10: Copy-Paste Test Blocks
+## Anti-Pattern 9: Copy-Paste Test Blocks
 
 ### What it looks like
 ```python
@@ -385,9 +332,8 @@ Use parameterized tests for variations on the same scenario. Reserve separate te
 | 5 | Snapshot overuse | Would I actually review this snapshot diff, or just update it? |
 | 6 | Bad test names | Can I understand what broke from the name alone? |
 | 7 | Shared mutable state | Can I run any test in isolation and get the same result? |
-| 8 | Ignoring error paths | What happens when this function receives bad input? |
-| 9 | Only happy path | Have I tested boundaries, empty inputs, and overflow cases? |
-| 10 | Copy-paste tests | Are these tests identical except for one or two values? |
+| 8 | Only happy path | Have I tested error paths, boundaries, and edge cases? |
+| 9 | Copy-paste tests | Are these tests identical except for one or two values? |
 
 ## The Meta-Rule
 

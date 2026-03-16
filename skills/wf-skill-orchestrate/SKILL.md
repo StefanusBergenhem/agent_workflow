@@ -56,51 +56,9 @@ build → review → APPROVED → merge to main, mark completed
 
 ### pipeline_state.yaml Schema
 
-```yaml
-# .workflow/pipeline_state.yaml
-current_phase: "idle"
-# Valid: idle | computing_stages | planning_worktrees | awaiting_stage_approval |
-#        executing_stage | stage_complete | retrospective | escalated
+See [SCHEMAS.md](SCHEMAS.md) for the full schema and examples.
 
-sprint_id: ""                    # Set from sprint.yaml
-
-stages:
-  total: 0                       # Total number of stages
-  current: 0                     # Current stage number (1-indexed)
-  definitions:
-    # Populated during computing_stages. Each stage is a group of independent tasks.
-    # 1: { tasks: ["S1.1", "S1.2"], status: pending }
-    # 2: { tasks: ["S1.3", "S1.4", "S1.5"], status: pending }
-    # 3: { tasks: ["S1.6"], status: pending }
-
-task_states:
-  # Per-task state tracking, populated during stage execution.
-  # "S1.1": { status: pending, branch: "", worktree_path: "", attempt_counter: 0 }
-  # Status: pending | building | reviewing | completed | escalated | blocked | design_issue
-
-blocked_tasks:
-  # Tasks in later stages blocked by escalated dependencies.
-  # "S1.6": { reason: "depends_on S1.5 which is escalated", blocked_by: "S1.5" }
-
-design_issues:
-  # Tasks halted due to design-level problems.
-  # "S1.3": { issue_id: "DI-001", summary: "Auth/DB boundary violation" }
-
-max_attempts: 3                  # Escalate when attempt_counter >= max_attempts
-
-last_transition:
-  from: ""
-  to: ""
-  timestamp: ""
-  reason: ""
-
-history:
-  # Append-only log of state transitions
-  - from: "idle"
-    to: "computing_stages"
-    timestamp: "YYYY-MM-DDTHH:MM:SS"
-    reason: "Pipeline started by user"
-```
+Key fields: `current_phase`, `stages.definitions`, `task_states`, `blocked_tasks`, `design_issues`, `max_attempts`, `history`.
 
 ---
 
@@ -121,61 +79,9 @@ history:
 
 ### Dispatch Protocol
 
-For every state transition that requires a sub-agent:
+See [DISPATCH.md](DISPATCH.md) for the full dispatch protocol, context envelopes, and per-phase file lists.
 
-1. **Read state.** Load `.workflow/pipeline_state.yaml`. Verify the current phase.
-
-2. **Verify gate.** If the transition requires a gate (human approval), confirm the gate has been passed. Do not proceed without explicit human approval for gated transitions.
-
-3. **Assemble context envelope.** Each sub-agent receives ONLY:
-   - Its own `SKILL.md` (the skill definition)
-   - The required state files for that phase (see Context Envelopes below)
-   - Files listed in `context_to_load` (for build phase)
-   - `config.yaml` for path/command resolution
-
-   **Key principle:** Sub-agents get the minimum context needed. They do not get other skills' definitions, pipeline state details, or files outside their scope.
-
-4. **Spawn sub-agent.** Dispatch with the assembled context.
-
-5. **Wait.** Let the sub-agent complete its work.
-
-6. **Read output.** Check the sub-agent's output artifacts (review_ready.yaml, feedback.yaml, design_issues.yaml, etc.).
-
-7. **Update state.** Write the new phase to `pipeline_state.yaml`. Append to the history log.
-
-8. **Gate check.** If the new state requires a gate, present the gate to the human and wait.
-
-### Context Envelopes
-
-#### Build Phase (per-task, in worktree)
-Sub-agent receives:
-- `skills/wf-skill-build/SKILL.md`
-- `config.yaml`
-- `<worktree_path>/.workflow/current_task.yaml`
-- `<worktree_path>/.workflow/feedback.yaml` (if exists — Fix Mode)
-- Files listed in `context_to_load` from the task contract
-- Memory file at `paths.memory`
-- `COMPONENTS.yaml` (for design issue detection)
-
-#### Review Phase (per-task, in worktree)
-Sub-agent receives:
-- `skills/wf-skill-review/SKILL.md`
-- `config.yaml`
-- `<worktree_path>/.workflow/current_task.yaml`
-- `<worktree_path>/.workflow/review_ready.yaml`
-- Git diff (via `git diff origin/main` within the worktree)
-- Memory file at `paths.memory`
-- Conventions file(s) at `paths.conventions`
-- `COMPONENTS.yaml` (for architecture compliance)
-- Relevant `ARCHITECTURE.md` file(s) for the task's component
-
-#### Retrospective Phase
-Sub-agent receives:
-- `skills/wf-skill-retrospective/SKILL.md`
-- `config.yaml`
-- `.workflow/pipeline_state.yaml`
-- `sprint.yaml`
-- `design_issues.yaml` (if exists)
+**Key principle:** Sub-agents get the minimum context needed. They do not get other skills' definitions, pipeline state details, or files outside their scope. Announce every state transition before dispatching.
 
 ---
 
@@ -196,25 +102,9 @@ When transitioning to `computing_stages`:
 
 5. **Handle blocked tasks.** Tasks with `status: "blocked"` in sprint.yaml (design issues from SwA) remain blocked. Skip them during stage computation and add to `blocked_tasks`.
 
-6. **Write stage definitions** to `pipeline_state.yaml`:
-   ```yaml
-   stages:
-     total: 3
-     current: 1
-     definitions:
-       1: { tasks: ["S1.1", "S1.2"], status: pending }
-       2: { tasks: ["S1.3", "S1.4", "S1.5"], status: pending }
-       3: { tasks: ["S1.6"], status: pending }
-   ```
+6. **Write stage definitions** and **initialize task_states** in `pipeline_state.yaml` (see [SCHEMAS.md](SCHEMAS.md) for format).
 
-7. **Initialize task_states** for all tasks:
-   ```yaml
-   task_states:
-     "S1.1": { status: pending, branch: "", worktree_path: "", attempt_counter: 0 }
-     "S1.2": { status: pending, branch: "", worktree_path: "", attempt_counter: 0 }
-   ```
-
-8. **Transition to `planning_worktrees`** for stage 1.
+7. **Transition to `planning_worktrees`** for stage 1.
 
 ---
 

@@ -39,26 +39,12 @@ If `COMPONENTS.yaml` does not exist, you are working on a new project. Create it
 
 Before planning new work, assess the current system health:
 
-#### 2a. Component Size Check
-For each component in `COMPONENTS.yaml`:
-- Count source files in the component's `path` directory
-- Count exported symbols (public interfaces)
-- Compare against `constraints.max_source_files` and `constraints.max_exported_symbols`
-- Flag any component that exceeds its constraints
+Run four fitness checks against `COMPONENTS.yaml` and the codebase:
 
-#### 2b. Dependency Direction Check
-For each `dependency_rules` entry:
-- Scan import statements across the codebase
-- Flag violations where a component imports from a disallowed dependency
-
-#### 2c. Responsibility Overlap Detection
-- Compare `owns` lists across components
-- Flag if two components claim ownership of the same concept
-- Flag if a concept appears in the codebase but no component owns it
-
-#### 2d. Duplication Detection
-- Identify similar functionality in different components (e.g., duplicate retry logic, HTTP clients, validation helpers)
-- Flag for consolidation
+1. **Component size** — flag components exceeding `constraints.max_source_files` or `constraints.max_exported_symbols`
+2. **Dependency direction** — flag imports violating `dependency_rules`
+3. **Responsibility overlap** — flag concepts owned by multiple components or owned by none
+4. **Duplication** — flag similar functionality across components (e.g., duplicate retry logic, HTTP clients)
 
 Present findings to the human as an architecture health report before proceeding.
 
