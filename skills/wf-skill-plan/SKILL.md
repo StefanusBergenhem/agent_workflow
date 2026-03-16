@@ -183,8 +183,26 @@ testing_mandate:
     - "User journey: navigate to page, perform action, verify result"
 
 doc_updates_required:
+  # Evaluate ALL four categories for every task. Omit a line only if the reason is stated.
   - path: "docs/API.md"
     action: "Add entry for new endpoint; document purpose, params, return"
+    category: "codebase"            # codebase | conventions | adr | sprint_backlog
+  # --- Doc checklist (architect fills out for every task) ---
+  # CODEBASE DESCRIPTION: Did this task add/remove/rename modules, files, interfaces, or public APIs?
+  #   YES → include the codebase doc (paths.codebase) with action describing what changed.
+  #   NO  → omit, but add a comment: "# codebase: no structural changes"
+  #
+  # CONVENTIONS: Did this task establish a new pattern, naming rule, or coding standard?
+  #   YES → include the conventions file (paths.conventions) with action describing the new rule.
+  #   NO  → omit, but add a comment: "# conventions: no new patterns introduced"
+  #
+  # ADR: Did this task make or confirm an architectural decision (tech choice, pattern, constraint)?
+  #   YES → include the ADR/architecture doc (paths.architecture) with a one-sentence decision record.
+  #   NO  → omit, but add a comment: "# adr: no architectural decisions made"
+  #
+  # SPRINT / BACKLOG PROGRESS: Always required.
+  #   → include the sprint file (paths.sprint) with action: "Mark task <step_id> [DONE] and update any
+  #     dependent items or notes in the backlog."
 
 implementation_notes: |
   # Optional free-form markdown for the Developer.
@@ -203,6 +221,8 @@ implementation_notes: |
 4. **Files to touch limit:** Max 3 files in `files_to_touch`. If more are needed, split the task.
 
 5. **Testing specificity:** Every test case must name specific inputs and expected outputs. "Edge cases" alone is not enough. "Happy path" alone is not enough.
+
+6. **Doc checklist is mandatory.** Every contract MUST evaluate all four doc categories (codebase, conventions, ADR, sprint/backlog). The sprint/backlog entry is always required. For the other three, either include the file + action OR add a comment explicitly stating why it was omitted. Silence is not acceptable — the Developer and Reviewer both need to know whether a doc update is expected.
 
 ### Step 6 — Write Stage Manifest (stage mode only)
 

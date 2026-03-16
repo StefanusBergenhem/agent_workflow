@@ -62,7 +62,7 @@ Execute the checklist in priority order. Stop at the first P0 failure — do not
 
 | # | Check | What to verify | Fail Action |
 |:--|:------|:---------------|:------------|
-| 2.1 | **Documentation** | All files in `doc_updates_required` were updated. New functions/endpoints have purpose, params, return, and side effects documented. No placeholder text or TODOs. | REJECT with `doc_missing` or `doc_quality` |
+| 2.1 | **Documentation** | All files in `doc_updates_required` were updated. New functions/endpoints have purpose, params, return, and side effects documented. No placeholder text or TODOs. Also verify: (a) the sprint file has the task marked `[DONE]`; (b) if `doc_updates_required` omits codebase/conventions/ADR entries, a comment in the contract explains why. | REJECT with `doc_missing` or `doc_quality` |
 | 2.2 | **Conventions compliance** | Code follows the conventions file(s) listed in `context_to_load`. Check naming, patterns, structure, error handling, imports. | REJECT with `convention_violation` |
 | 2.3 | **Clean code** | No leftover debug output (`fmt.Println`, `console.log`, `print()`, `log.Println` used for debugging). No commented-out code blocks. No TODO/HACK/FIXME comments in production code. | REJECT with `clean_code_violation` |
 
