@@ -55,6 +55,9 @@ Read the log file after the command completes. This prevents terminal flooding a
 ### Compile Checks
 **Compile-check after every file modification.** After writing or modifying any source file, run the appropriate type-check or compile command (from `commands.typecheck` in config, or the language-appropriate default). Do not wait until the end to discover compilation errors.
 
+### Lint Checks
+**Lint after every file modification.** After writing or modifying any source file, run `commands.lint` from config. Lint errors are code errors — fix them immediately, do not defer to preflight. If no `commands.lint` is configured, HALT and report.
+
 ### File Boundaries
 **File boundaries are absolute.** Only modify files listed in `files_to_touch`. If compilation or tests require touching another file, HALT and report — do not expand scope independently.
 
@@ -127,11 +130,11 @@ During implementation, if you encounter a situation where the failure is NOT in 
 
 ### Refactor Phase
 After all tests pass:
-- No lint errors
-- No dead code
-- No TODO/HACK/FIXME comments in production code
-- No leftover debug output (`console.log`, `fmt.Println`, `print()`, `log.Println` used for debugging)
-- No commented-out code blocks
+1. **Run `commands.lint`** on all modified files. Fix every error. Do not proceed with lint failures.
+2. No dead code
+3. No TODO/HACK/FIXME comments in production code
+4. No leftover debug output (`console.log`, `fmt.Println`, `print()`, `log.Println` used for debugging)
+5. No commented-out code blocks
 
 ---
 

@@ -71,13 +71,14 @@ Execute the checklist in priority order. Stop at the first P0 failure — do not
 | 1.3 | **TDD evidence** | `tdd_evidence` in `review_ready.yaml` shows a red phase with real failure messages that correspond to the test cases. If the red phase is missing, vague, or fake, reject. | REJECT with `tdd_missing` |
 | 1.4 | **Suppression scan** | Scan the diff for suppression directives: `@ts-ignore`, `// nolint`, `# type: ignore`, `eslint-disable`, `noqa`, `@SuppressWarnings`, or any equivalent. | REJECT with `convention_violation` |
 
-#### P2 — Code Quality (any failure = REJECT)
+#### P2 — Lint & Code Quality (any failure = REJECT)
 
 | # | Check | What to verify | Fail Action |
 |:--|:------|:---------------|:------------|
-| 2.1 | **Documentation** | All files in `doc_updates_required` were updated. New functions/endpoints have purpose, params, return, and side effects documented. No placeholder text or TODOs. Also verify: (a) the sprint file has the task marked `[DONE]`; (b) if `doc_updates_required` omits codebase/conventions/ADR entries, a comment in the contract explains why. | REJECT with `doc_missing` or `doc_quality` |
-| 2.2 | **Conventions compliance** | Code follows the conventions file(s) listed in `context_to_load`. Check naming, patterns, structure, error handling, imports. | REJECT with `convention_violation` |
-| 2.3 | **Clean code** | No leftover debug output (`fmt.Println`, `console.log`, `print()`, `log.Println` used for debugging). No commented-out code blocks. No TODO/HACK/FIXME comments in production code. | REJECT with `clean_code_violation` |
+| 2.1 | **Independent lint** | Run `commands.lint` from config yourself on the modified files. Do not trust the Developer's refactor-phase lint claim — run it independently. If `commands.lint` is not configured, HALT. | REJECT with `lint_fail` |
+| 2.2 | **Documentation** | All files in `doc_updates_required` were updated. New functions/endpoints have purpose, params, return, and side effects documented. No placeholder text or TODOs. Also verify: (a) the sprint file has the task marked `[DONE]`; (b) if `doc_updates_required` omits codebase/conventions/ADR entries, a comment in the contract explains why. | REJECT with `doc_missing` or `doc_quality` |
+| 2.3 | **Conventions compliance** | Code follows the conventions file(s) listed in `context_to_load`. Check naming, patterns, structure, error handling, imports. | REJECT with `convention_violation` |
+| 2.4 | **Clean code** | No leftover debug output (`fmt.Println`, `console.log`, `print()`, `log.Println` used for debugging). No commented-out code blocks. No TODO/HACK/FIXME comments in production code. | REJECT with `clean_code_violation` |
 
 #### P3 — Integration (any failure = REJECT)
 
@@ -175,7 +176,7 @@ failures:
     #   scope_violation | test_missing | test_quality | tdd_missing |
     #   doc_missing | doc_quality | convention_violation | preflight_fail |
     #   security_violation | clean_code_violation | acceptance_criteria_unmet |
-    #   e2e_missing | architecture_violation
+    #   e2e_missing | architecture_violation | lint_fail
     file: "src/module/feature.test.ts"
     detail: |
       Branch 'null input' is listed in coverage claim but no test case
