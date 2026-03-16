@@ -1,6 +1,6 @@
 ---
 name: wf-skill-retrospective
-description: Sprint retrospective that analyses what happened during pipeline execution — successes, failures, design issues, and improvement suggestions.
+description: Sprint retrospective that analyses what happened during pipeline execution — successes, failures, design issues, and improvement suggestions. Use when triggered automatically by orchestrator after all tasks complete, or manually at sprint end.
 ---
 
 # Skill: Retrospective — Sprint Analysis

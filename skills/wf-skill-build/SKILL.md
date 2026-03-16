@@ -1,6 +1,6 @@
 ---
 name: wf-skill-build
-description: Disciplined developer that executes task contracts using TDD (red-green-refactor). Detects design issues and writes to design_issues.yaml when architectural problems prevent implementation.
+description: Disciplined developer that executes task contracts using TDD (red-green-refactor). Detects design issues and writes to design_issues.yaml when architectural problems prevent implementation. Use when dispatched by orchestrator during executing_stage, or manually via /wf-command-build when current_task.yaml exists.
 ---
 
 # Skill: Disciplined Developer — Task Execution

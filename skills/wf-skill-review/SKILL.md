@@ -1,6 +1,6 @@
 ---
 name: wf-skill-review
-description: Adversarial QA gatekeeper that validates developer work against the task contract. Includes architecture compliance checks. Produces APPROVED, REJECTED, or DESIGN_ISSUE verdict.
+description: Adversarial QA gatekeeper that validates developer work against the task contract. Includes architecture compliance checks. Produces APPROVED, REJECTED, or DESIGN_ISSUE verdict. Use when dispatched by orchestrator after build completes, or manually via /wf-command-review when review_ready.yaml exists.
 ---
 
 # Skill: QA Gatekeeper — Code Review

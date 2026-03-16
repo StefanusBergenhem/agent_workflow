@@ -1,6 +1,6 @@
 ---
 name: wf-skill-orchestrate
-description: Pipeline controller state machine that manages build-review-retrospective phase transitions with stage-based parallelism, dispatches sub-agents, handles design issues, and enforces gate conditions.
+description: Pipeline controller state machine that manages build-review-retrospective phase transitions with stage-based parallelism, dispatches sub-agents, handles design issues, and enforces gate conditions. Use when invoked by /wf-command-pipeline when sprint.yaml exists with pending tasks.
 ---
 
 # Skill: Pipeline Controller — Orchestration

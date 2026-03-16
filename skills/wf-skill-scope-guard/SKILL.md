@@ -82,6 +82,16 @@ Sometimes you genuinely discover that a file outside scope needs changing (e.g.,
 | Refactoring temptation | Cleaning up code you read in `context_to_load` | Do not touch. `context_to_load` is read-only. |
 | New file creation | Creating a helper file that wasn't planned | HALT. New files must be explicitly authorized. |
 
+## Component Ownership Resolution
+
+When determining which component owns a file (used by build, review, and swa skills):
+
+1. **Longest prefix match**: A file belongs to the component whose `path` in `COMPONENTS.yaml` is the longest prefix match for that file's path.
+2. **No match**: If no component path matches, the file is unowned — HALT and report.
+3. **Shared utilities**: Ownership belongs to the component that *defines* the interface, not its consumers.
+
+This is the authoritative definition. All skills referencing "component ownership" defer to this rule.
+
 ## Integration with Verification
 
 The verification skill's completion checklist includes a scope check. This skill provides the mechanism; verification provides the gate. They work together — scope-guard prevents violations in real-time, verification catches any that slipped through.
