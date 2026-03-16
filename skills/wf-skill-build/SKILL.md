@@ -1,6 +1,6 @@
 ---
 name: wf-skill-build
-description: Disciplined developer that executes task contracts using TDD (red-green-refactor). Activates when a current_task.yaml exists and the pipeline is in the build phase.
+description: Disciplined developer that executes task contracts using TDD (red-green-refactor). Detects design issues and writes to design_issues.yaml when architectural problems prevent implementation.
 ---
 
 # Skill: Disciplined Developer — Task Execution
@@ -19,6 +19,7 @@ You are the Lead Developer. You execute the contract in `.workflow/current_task.
 | Feedback (Fix Mode) | `.workflow/feedback.yaml` | What to fix — only present if rejected by Reviewer |
 | Context Files | Listed in `context_to_load` | ONLY these files. No speculative exploration. |
 | Config | `config.yaml` | Project-level settings, paths, commands |
+| Components | `COMPONENTS.yaml` (project root) | Component boundaries and dependency rules (for design issue detection) |
 
 ---
 
@@ -36,6 +37,7 @@ You are the Lead Developer. You execute the contract in `.workflow/current_task.
 3. Load ONLY the files listed in `context_to_load`. No speculative exploration outside that list.
 4. If the task has `depends_on`, verify that dependency is merged into the current branch. If not, HALT and report.
    - **Worktree mode:** When running inside a worktree (parallel stage execution), `depends_on` tasks from prior stages are already merged into `origin/main` from which the worktree branched. Only check for dependencies within the same stage.
+5. Read `COMPONENTS.yaml` if it exists — needed for design issue detection (Step 3b).
 
 ---
 
@@ -86,6 +88,42 @@ If tests pass before implementation exists, something is wrong — you are eithe
      3. Hypothesize the root cause (not the symptom)
      4. Verify the hypothesis before attempting the fix
    - **On the 3rd consecutive failure:** HALT with the exact error output and the three approaches tried. Do not continue.
+
+### Step 3b — Design Issue Detection
+
+During implementation, if you encounter a situation where the failure is NOT in the code but in the contract or architecture, write a design issue instead of continuing to retry:
+
+**Design issue criteria:**
+- A file you need to import from belongs to a component that `dependency_rules` in `COMPONENTS.yaml` forbids
+- The task requires modifying a file not in `files_to_touch` and the file belongs to a different component
+- An interface declared in the task contract or `ARCHITECTURE.md` doesn't actually exist in the source code
+- An invariant in `ARCHITECTURE.md` conflicts with what the acceptance criteria require
+- A shared type change would cascade beyond the files in scope and cannot be contained
+
+**When you detect a design issue:**
+
+1. Write to `design_issues.yaml` in the project root (append if file exists):
+   ```yaml
+   issues:
+     - id: "DI-<next_number>"
+       detected_by: "developer"
+       task_id: "<task_id from contract>"
+       level: "software_architect"    # or "solution_architect" for boundary issues
+       summary: "Clear description of the architectural problem"
+       impact: "Task <task_id> blocked"
+       status: "open"
+   ```
+
+2. **HALT the task immediately.** Do not retry. Do not attempt workarounds that violate boundaries.
+
+3. Write a partial `review_ready.yaml` with `status: design_issue` to signal the orchestrator:
+   ```yaml
+   version: 1
+   task_id: "<task_id>"
+   status: design_issue
+   design_issue_id: "DI-<number>"
+   files_modified: []
+   ```
 
 ### Refactor Phase
 After all tests pass:
@@ -202,9 +240,10 @@ doc_updates_applied:
    - Make the minimal change needed to address it
    - Do NOT restart the entire task from scratch
    - Do NOT address issues not listed in the feedback
-4. Re-run the verification checklist (Step 6) and preflight.
-5. Overwrite `.workflow/review_ready.yaml` with updated results.
-6. Re-stage modified files.
+4. **Design issue check:** If the fix reveals an architectural problem (same criteria as Step 3b), write a design issue and HALT instead of continuing to fail.
+5. Re-run the verification checklist (Step 6) and preflight.
+6. Overwrite `.workflow/review_ready.yaml` with updated results.
+7. Re-stage modified files.
 
 **Fix Mode constraints:**
 - Treat each feedback failure as a targeted fix, not a rewrite
@@ -223,3 +262,4 @@ Stop immediately and report to the human if:
 - A dependency declared in `depends_on` has not been merged
 - The preflight command is not configured and cannot be determined
 - You discover a security vulnerability in existing code (report it, do not fix it in this task)
+- A design-level problem is detected (write design_issues.yaml and HALT — do not retry)

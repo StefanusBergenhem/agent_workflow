@@ -1,9 +1,16 @@
 ---
 name: wf-command-analyse
-description: "Run the analyse phase — cut a sprint from the backlog"
+description: "[DEPRECATED] Use /wf-command-sa + /wf-command-swa instead"
 ---
 
-Load and execute the analyse skill.
+> **DEPRECATED:** This command has been replaced by the layered architecture workflow:
+> 1. `/wf-command-strategist` — Structure ideas into `roadmap.yaml`
+> 2. `/wf-command-sa` — Translate roadmap into `master_backlog.yaml` + `COMPONENTS.yaml`
+> 3. `/wf-command-swa` — Detail next sprint into `sprint.yaml` with full task contracts
+>
+> The old analyse skill is kept for backward compatibility but is no longer invoked by the pipeline.
+
+Legacy usage (if needed):
 
 1. Read `.workflow/config.yaml` for project paths
 2. Read the roadmap, sprint, and state files specified in config

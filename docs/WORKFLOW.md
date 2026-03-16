@@ -26,63 +26,97 @@ In any project directory:
 This creates:
 - `.workflow/config.yaml` — project settings (language, test commands, paths)
 - `.workflow/pipeline_state.yaml` — pipeline state tracker
+- `COMPONENTS.yaml` — empty component registry
+- `master_backlog.yaml` — empty backlog
 - `.workflow/` added to `.gitignore`
+
+For existing codebases, use deep mode:
+```
+/wf-command-init deep
+```
+This additionally generates `COMPONENTS.yaml` with discovered modules, per-module `ARCHITECTURE.md` files, and an `architecture_audit.md` report.
 
 Review and customize `.workflow/config.yaml` — especially the `commands` and `paths` sections.
 
-### 3. Create your docs
+---
 
-The workflow expects these files to exist (paths configurable in `config.yaml`):
+## Role Hierarchy
 
-| File | Purpose |
-|:-----|:--------|
-| `docs/ROADMAP.md` | Feature backlog — what needs to be built |
-| `docs/SPRINT.md` | Current sprint — tasks being worked on |
-| `docs/STATE.md` | System state — known issues, deferred items |
-| `docs/CONVENTIONS.md` | Coding standards and patterns |
-| `docs/ARCHITECTURE.md` | Domain model, ADRs, constraints |
+The workflow uses a **layered role hierarchy**. The top three roles are invoked manually; the bottom three run as an automated pipeline.
+
+| Role | Command | Input | Output |
+|:-----|:--------|:------|:-------|
+| **Product Strategist** | `/wf-command-strategist` | Conversation, `roadmap.yaml` | `roadmap.yaml` |
+| **Solution Architect** | `/wf-command-sa` | `roadmap.yaml`, `COMPONENTS.yaml`, `ARCHITECTURE.md` | `master_backlog.yaml`, `COMPONENTS.yaml`, `ARCHITECTURE.md` |
+| **Software Architect** | `/wf-command-swa` | `master_backlog.yaml`, source code | `sprint.yaml` (with task contracts) |
+| **Developer** | (automated) | `sprint.yaml` task contracts | Code + `review_ready.yaml` |
+| **Reviewer** | (automated) | Code diff, task contract | APPROVED / REJECTED / DESIGN_ISSUE |
+| **Retrospective** | (automated) | Pipeline state, sprint data | `retrospective/<sprint-id>.md` |
+
+### Manual Phases (you decide when)
+
+```
+/wf-command-strategist  →  roadmap.yaml
+/wf-command-sa          →  master_backlog.yaml + COMPONENTS.yaml + ARCHITECTURE.md
+/wf-command-swa         →  sprint.yaml (with task contracts)
+```
+
+### Automated Pipeline
+
+```
+/wf-command-pipeline reads sprint.yaml
+  → compute stages (dependency sort)
+  → for each stage:
+      → create worktrees + branches per task
+      → human approves stage
+      → spawn parallel build agents
+      → spawn review agent per completed build
+      → merge approved tasks to main
+      → halt tasks with design issues → write design_issues.yaml
+      → escalate tasks with 3 failures
+  → after all stages: run retrospective
+  → produce retrospective/<sprint-id>.md
+  → idle
+```
 
 ---
 
 ## The Pipeline
 
-The pipeline uses **stage-based parallelism**: tasks are grouped into dependency stages via topological sort, tasks within a stage run in parallel (in separate git worktrees), and stages execute serially.
+The automated pipeline uses **stage-based parallelism**: tasks are grouped into dependency stages via topological sort, tasks within a stage run in parallel (in separate git worktrees), and stages execute serially.
 
-```
-/wf-command-analyse → approve sprint → compute stages →
-  plan stage → approve stage → execute stage (parallel builds + reviews) →
-    [more stages?] → plan next stage →
-    [all done?] → idle
-```
-
-Within each stage execution (parallel per task):
-```
-Each task: build → review → approve → merge to main
-                          → reject  → retry build (max 3x, then escalate)
-```
-
-### Running the full pipeline
+### Running the pipeline
 
 ```
 /wf-command-pipeline
 ```
 
-This starts the orchestrator, which runs **resume detection first**:
-- If a sprint file exists with incomplete tasks → resumes mid-sprint at the correct phase (skips analyse)
-- If no sprint exists → starts fresh with `/wf-command-analyse`
+**Prerequisites:** `sprint.yaml` must exist (produced by `/wf-command-swa`). If missing, the pipeline HALTs and tells you to run `/wf-command-swa`.
 
-After resume detection (or a fresh start):
+The orchestrator runs **resume detection first**:
+- If `sprint.yaml` exists with incomplete tasks → resumes mid-sprint at the correct phase
+- If no `sprint.yaml` exists → HALTs
+
+After resume detection:
 1. Computes dependency stages (topological sort of sprint tasks)
-2. For each stage: plans all tasks as a batch, pauses for your approval, then executes all tasks in parallel
+2. For each stage: creates worktrees, pauses for your approval, then executes all tasks in parallel
 3. Approved tasks merge to main immediately; rejected tasks retry up to 3 times
+4. Design issues halt the affected task (no retries — requires architect fix)
+5. After all stages: runs retrospective automatically
+
+### Within each stage execution (parallel per task)
+
+```
+build → review → APPROVED → merge to main
+               → REJECTED → retry build (max 3x, then escalate)
+               → DESIGN_ISSUE → halt task, write design_issues.yaml
+```
 
 ### Running phases individually
 
 You can also run each phase manually:
 
 ```
-/wf-command-analyse    # Cut a sprint from the backlog
-/wf-command-plan       # Create task contracts for the current stage
 /wf-command-build      # Execute a task contract (TDD)
 /wf-command-review     # Validate the build against the contract
 ```
@@ -95,57 +129,72 @@ This is useful when you want more control, or when resuming after an interruptio
 /wf-command-status
 ```
 
-Reports: current phase, stage progress (N of M), per-task status within the active stage (building/reviewing/completed/escalated), blocked tasks, worktree locations, and next action.
+Reports: current phase, stage progress (N of M), per-task status within the active stage (building/reviewing/completed/escalated/design_issue), blocked tasks, worktree locations, and next action.
 
 ---
 
 ## Phase Details
 
-### /wf-command-analyse — Sprint Cutting
+### /wf-command-strategist — Product Strategy
 
-**What it does:** Reads your roadmap and current state, then proposes a sprint cut — a set of sized, ordered, dependency-aware tasks.
+**What it does:** Freeform conversation partner for product thinking. Takes unstructured input (stakeholder requests, user feedback, ideas) and helps structure it into a prioritized roadmap.
 
-**You'll be asked to approve** the sprint before anything is written.
+**You decide when to run this.** Typically at the start of a project or when new requirements arrive.
+
+**Output:** `roadmap.yaml` — structured file with epics, features, priorities, dependencies.
+
+### /wf-command-sa — Solution Architecture
+
+**What it does:** Translates roadmap into technical strategy. Makes system-level decisions (component structure, data flows, dependency rules). Maintains architecture health.
+
+**You decide when to run this.** After strategist, or when architecture needs updating.
+
+**What it does:**
+- Architecture health checks (component size, dependency violations, duplication)
+- Technical design decisions for roadmap features
+- Updates `COMPONENTS.yaml` (component registry with constraints and dependency rules)
+- Updates/creates per-module `ARCHITECTURE.md` files
+- Builds `master_backlog.yaml` with sprint groupings
+
+**Output:** `master_backlog.yaml`, updated `COMPONENTS.yaml`, updated `ARCHITECTURE.md` files.
+
+### /wf-command-swa — Software Architecture
+
+**What it does:** Takes the next sprint from the master backlog, reads actual source code in affected components, and produces detailed `sprint.yaml` with full task contracts.
+
+**You decide when to run this.** After SA, or when ready to start the next sprint.
 
 **What to look for:**
 - Are tasks sized correctly? (max 3 files, max 150 lines each)
-- Are dependencies explicit and ordered correctly?
-- Are high-risk tasks scheduled early?
-- Is anything missing from the backlog?
-
-**Output:** Sprint written to your sprint file.
-
-### /wf-command-plan — Task Contracts (Stage Mode)
-
-**What it does:** Takes all tasks in the current dependency stage and produces task contracts for each — files to touch, files to read for context, acceptance criteria, and a testing mandate. Creates one git worktree per task.
-
-**You'll be asked to approve** all contracts for the stage as a batch before execution begins.
-
-**What to look for:**
-- Are the right files in `context_to_load`? (max 5 per task)
-- Are the right files in `files_to_touch`? (max 3 per task)
 - Are acceptance criteria clear and testable?
-- Is the testing mandate complete (happy path, edge cases, error paths)?
-- Are `out_of_scope` boundaries clear?
-- Are blocked tasks (from escalated dependencies) correctly excluded?
+- Are component boundaries respected?
+- Are there design issues flagged?
 
-**Output:** `.workflow/stage_manifest.yaml` (listing all worktrees and contracts) + one `.workflow/current_task.yaml` per worktree + feature branches created.
+**Output:** `sprint.yaml` with inline task contracts, optionally `design_issues.yaml`.
+
+### /wf-command-pipeline — Automated Execution
+
+**What it does:** Reads `sprint.yaml` and executes the full build→review→merge pipeline.
+
+**Runs automatically** after you approve each stage.
+
+**Output:** Merged code + `retrospective/<sprint-id>.md`.
 
 ### /wf-command-build — TDD Execution
 
-**What it does:** Executes the task contract using strict TDD:
+**What it does:** Executes a task contract using strict TDD:
 1. Writes tests first, confirms they FAIL (red phase)
 2. Implements code to make tests pass (green phase)
 3. Refactors (refactor phase)
 4. Runs preflight, writes completion claim
 
-**Runs automatically** — no approval gate. Proceeds directly to review. During stage execution, each build runs in its own git worktree.
-
 **Two modes:**
 - **Build mode** — fresh implementation from the contract
-- **Fix mode** — activated when `feedback.yaml` exists from a prior review rejection. Addresses only the listed failures.
+- **Fix mode** — activated when `feedback.yaml` exists from a prior review rejection
 
-**Output:** Code changes + `<worktree>/.workflow/review_ready.yaml`.
+**Design issue detection:** If the developer discovers an architectural problem during implementation (wrong boundary, missing interface, impossible constraint), they write to `design_issues.yaml` and halt — no retries.
+
+**Output:** Code changes + `.workflow/review_ready.yaml`.
 
 ### /wf-command-review — QA Validation
 
@@ -153,16 +202,63 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 
 | Priority | Checks |
 |:---------|:-------|
-| P0 (critical) | Security scan, scope audit, acceptance criteria |
+| P0 (critical) | Security scan, scope audit, acceptance criteria, **architecture compliance** |
 | P1 (tests) | Test existence, test quality, TDD evidence, suppression scan |
 | P2 (quality) | Documentation, conventions, clean code |
 | P3 (integration) | Independent preflight run |
 
-**Runs automatically** after build.
+**Architecture compliance (new):** Verifies modified files belong to the correct component per `COMPONENTS.yaml`, checks import directions against `dependency_rules`, validates ownership per `ARCHITECTURE.md`.
 
-**On approval:** Pushes the branch, merges to main (with conflict detection), cleans up the worktree, and updates sprint status.
+**On approval:** Pushes the branch, merges to main, cleans up the worktree.
 
-**On rejection:** Writes `.workflow/feedback.yaml` with specific failures. Build re-runs in fix mode. Max 3 attempts per task before escalating. Other tasks in the stage continue unaffected.
+**On rejection:** Writes `.workflow/feedback.yaml` with specific failures. Build re-runs in fix mode. Max 3 attempts.
+
+**On design issue:** Writes `design_issues.yaml`. Task is halted, not retried.
+
+---
+
+## Architecture Governance
+
+### COMPONENTS.yaml
+
+The component registry defines system structure, boundaries, and rules:
+
+```yaml
+components:
+  auth:
+    path: src/auth/
+    owns: [authentication, session-management]
+    exposes: [AuthMiddleware, SessionStore]
+    depends_on: [database, user-service]
+    constraints:
+      max_source_files: 20
+      max_exported_symbols: 15
+
+dependency_rules:
+  - "ui must not import from database"
+  - "no circular dependencies"
+```
+
+### ARCHITECTURE.md (per module)
+
+Each component can have an `ARCHITECTURE.md` documenting its responsibility, ownership boundaries, key interfaces, and invariants.
+
+### design_issues.yaml
+
+Written by the developer or reviewer when they discover a design-level problem that can't be fixed at the code level:
+
+```yaml
+issues:
+  - id: "DI-001"
+    detected_by: "developer"
+    task_id: "S1.3"
+    level: "solution_architect"
+    summary: "Auth module needs direct DB access but dependency rules forbid it"
+    impact: "Task S1.3 blocked"
+    status: "open"
+```
+
+Design issues require resolution via `/wf-command-sa` or `/wf-command-swa`.
 
 ---
 
@@ -170,14 +266,15 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 
 Hooks run automatically during Claude's work. You don't invoke them — they fire on tool use events.
 
-| Hook | Triggers on | What it catches |
-|:-----|:------------|:----------------|
-| `post-build-scope-audit.sh` | Every Edit/Write | Files modified outside `files_to_touch` |
-| `post-build-suppression-scan.sh` | Every Edit/Write | `nolint`, `eslint-disable`, `@ts-ignore`, etc. |
-| `post-build-tdd-evidence.sh` | Manual check | Missing or fake TDD red-phase evidence |
-| `retry-loop-detector.sh` | Every Bash command | Same command run 3+ times consecutively |
-
-Hooks that detect a violation **block Claude** (exit code 2) and display a clear error message with required actions.
+| Hook | Triggers on | What it catches | Blocking? |
+|:-----|:------------|:----------------|:----------|
+| `post-build-scope-audit.sh` | Every Edit/Write | Files modified outside `files_to_touch` | Yes (exit 2) |
+| `post-build-suppression-scan.sh` | Every Edit/Write | `nolint`, `eslint-disable`, `@ts-ignore`, etc. | Yes (exit 2) |
+| `import-direction-check.sh` | Every Edit/Write | Import statements violating `COMPONENTS.yaml` dependency_rules | Yes (exit 2) |
+| `component-size-check.sh` | Every Edit/Write | Components exceeding max_source_files or max_exported_symbols | No (warning only) |
+| `architecture-staleness-check.sh` | Every Edit/Write | Source changes without ARCHITECTURE.md update | No (warning only) |
+| `post-build-tdd-evidence.sh` | Manual check | Missing or fake TDD red-phase evidence | Yes (exit 2) |
+| `retry-loop-detector.sh` | Every Bash command | Same command run 3+ times consecutively | Yes (exit 2) |
 
 ### Disabling hooks temporarily
 
@@ -192,19 +289,30 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 | File | Written by | Read by | Purpose |
 |:-----|:-----------|:--------|:--------|
 | `config.yaml` | `/wf-command-init` (you edit) | All phases | Project config — paths, commands, limits, parallel settings |
-| `pipeline_state.yaml` | Orchestrator | Orchestrator | Current phase, stages, per-task states, blocked tasks, history |
-| `stage_manifest.yaml` | `/wf-command-plan` | Orchestrator, `/wf-command-build` | Active stage: worktree paths, branches, task contracts |
-| `current_task.yaml` | `/wf-command-plan` (per worktree) | `/wf-command-build`, `/wf-command-review` | The task contract — scope, tests, criteria |
-| `review_ready.yaml` | `/wf-command-build` (per worktree) | `/wf-command-review` | Build completion claim with TDD evidence |
-| `feedback.yaml` | `/wf-command-review` (per worktree) | `/wf-command-build` (fix mode) | Rejection details with required fixes |
+| `pipeline_state.yaml` | Orchestrator | Orchestrator | Current phase, stages, per-task states, design issues, blocked tasks, history |
+| `stage_manifest.yaml` | Orchestrator | Orchestrator, Build, Review | Active stage: worktree paths, branches, task contracts |
+| `current_task.yaml` | Orchestrator (per worktree) | Build, Review | The task contract — scope, tests, criteria |
+| `review_ready.yaml` | Build (per worktree) | Review | Build completion claim with TDD evidence |
+| `feedback.yaml` | Review (per worktree) | Build (fix mode) | Rejection details with required fixes |
+
+### Architecture files (project root, committed to git)
+
+| File | Written by | Read by | Purpose |
+|:-----|:-----------|:--------|:--------|
+| `roadmap.yaml` | `/wf-command-strategist` | SA | Product roadmap with epics and features |
+| `COMPONENTS.yaml` | `/wf-command-sa` (or `/wf-command-init deep`) | SwA, Build, Review, Hooks | Component registry and dependency rules |
+| `*/ARCHITECTURE.md` | `/wf-command-sa` (or `/wf-command-init deep`) | SwA, Review | Per-module architecture docs |
+| `master_backlog.yaml` | `/wf-command-sa` | SwA | Ordered backlog with sprint groupings |
+| `sprint.yaml` | `/wf-command-swa` | Pipeline | Sprint with full inline task contracts |
+| `design_issues.yaml` | Build, Review, SwA | Human, SA, SwA | Design-level problems requiring architect resolution |
 
 ### Pipeline lifecycle
 
 ```
-idle → analysing → awaiting_analyse_approval → computing_stages →
-  planning_stage → awaiting_stage_approval → executing_stage → stage_complete →
-    [more stages?] → planning_stage (next stage)
-    [all done?] → idle
+idle → computing_stages → planning_worktrees → awaiting_stage_approval →
+  executing_stage → stage_complete →
+    [more stages?] → planning_worktrees (next stage)
+    [all done?] → retrospective → idle
 ```
 
 ### Per-task lifecycle (within a stage)
@@ -213,9 +321,10 @@ idle → analysing → awaiting_analyse_approval → computing_stages →
 pending → building → reviewing → completed (merge to main)
                                → rejected → building (fix mode)
                                           → attempt_counter >= 3 → escalated
+                               → design_issue → halted (needs architect)
 ```
 
-Escalated tasks propagate blocks to their dependents in later stages.
+Escalated and design-issue tasks propagate blocks to their dependents in later stages.
 
 ---
 
@@ -233,16 +342,16 @@ parallel:
 
 ### How stages work
 
-1. **Stage computation** — After sprint approval, tasks are topologically sorted by their `depends_on` declarations into stages:
+1. **Stage computation** — Tasks are topologically sorted by their `depends_on` declarations into stages:
    - Stage 1: tasks with no dependencies
    - Stage 2: tasks depending only on stage 1 tasks
    - Stage N: tasks whose dependencies are all in earlier stages
 
-2. **Planning** — All tasks in a stage are planned as a batch. One worktree and branch per task.
+2. **Worktree planning** — The orchestrator creates one worktree and branch per task, writes task contracts to each worktree.
 
 3. **Execution** — All tasks build and review in parallel. Approved tasks merge to main immediately.
 
-4. **Stage completion** — When all tasks in a stage are completed or escalated, worktrees are cleaned up and the next stage begins.
+4. **Stage completion** — When all tasks in a stage are completed, escalated, or halted (design issue), worktrees are cleaned up and the next stage begins.
 
 ### Merge protocol
 
@@ -254,11 +363,41 @@ When a task's review is approved:
 
 ### Escalation propagation
 
-When a task is escalated (3 failed attempts):
-- The task is marked `escalated` in pipeline state
+When a task is escalated (3 failed attempts) or halted (design issue):
+- The task is marked appropriately in pipeline state
 - All tasks in later stages that depend on it (directly or transitively) are marked as `blocked`
 - Other tasks in the current stage continue unaffected
-- Blocked tasks are reported in the sprint completion summary
+- Blocked tasks are reported in the sprint completion summary and retrospective
+
+---
+
+## Retrospective
+
+At the end of every sprint pipeline run, a retrospective is automatically generated:
+
+```
+retrospective/<sprint-id>.md
+```
+
+The retrospective includes:
+- **Summary:** Tasks planned vs completed, first-attempt passes, escalations
+- **What worked:** Tasks that passed first attempt and why
+- **What failed:** Rejection patterns, root causes, categorized by failure type
+- **Design issues surfaced:** From `design_issues.yaml`
+- **Suggested improvements:** Specific, actionable changes to workflow, architecture, task sizing, or contract quality
+
+The retrospective runs without a human gate. Review it after each sprint to improve the next one.
+
+---
+
+## Deprecated Commands
+
+The following commands are deprecated but kept for backward compatibility:
+
+| Deprecated | Replaced by |
+|:-----------|:------------|
+| `/wf-command-analyse` | `/wf-command-sa` + `/wf-command-swa` |
+| `/wf-command-plan` | `/wf-command-swa` (contracts) + pipeline (worktrees) |
 
 ---
 
@@ -278,24 +417,33 @@ This overrides the global `~/.claude/skills/wf-skill-build/SKILL.md` for this pr
 
 ## Common Scenarios
 
-### Starting a new sprint
+### Starting a new project
 
-```
-/wf-command-pipeline
-```
-Or step by step:
-1. `/wf-command-analyse` — review the sprint cut, approve it
-2. The orchestrator computes dependency stages automatically
-3. For each stage: review the batch of task contracts, approve them
-4. Tasks build and review in parallel. Approved tasks merge to main.
-5. When a stage completes, the next stage is planned automatically.
+1. `/wf-command-init` (or `/wf-command-init deep` for existing code)
+2. `/wf-command-strategist` — discuss product goals, produce `roadmap.yaml`
+3. `/wf-command-sa` — define architecture, produce `master_backlog.yaml`
+4. `/wf-command-swa` — detail first sprint, produce `sprint.yaml`
+5. `/wf-command-pipeline` — execute the sprint
+
+### Starting the next sprint
+
+1. `/wf-command-swa` — detail the next sprint from master backlog
+2. `/wf-command-pipeline` — execute it
+
+### Handling design issues
+
+When the pipeline surfaces a design issue:
+1. Review `design_issues.yaml`
+2. Run `/wf-command-sa` to amend architecture if needed
+3. Run `/wf-command-swa` to re-detail affected tasks
+4. Run `/wf-command-pipeline` to re-execute
 
 ### Resuming after an interruption
 
 ```
 /wf-command-pipeline
 ```
-The orchestrator automatically detects the in-progress sprint and resumes from the correct phase. Run `/wf-command-status` first if you want to see where things stand before proceeding.
+The orchestrator automatically detects the in-progress sprint and resumes from the correct phase. Run `/wf-command-status` first if you want to see where things stand.
 
 ### Build was rejected
 
@@ -304,7 +452,7 @@ Handled automatically during stage execution. The orchestrator re-runs the build
 ### Task is stuck (3 rejections)
 
 The task is escalated. Other tasks in the stage continue. Options:
-- Re-plan the task with a different approach
+- Re-plan the task with a different approach (run `/wf-command-swa`)
 - Fix the issue manually in the worktree
 - Skip the task (dependents in later stages will be blocked)
 
@@ -312,29 +460,24 @@ The task is escalated. Other tasks in the stage continue. Options:
 
 The merge is aborted and escalated to you. You'll see which files conflict and which branches are involved. Resolve manually, then the pipeline continues.
 
-### Adding a new project
-
-```
-cd /path/to/new-project
-/wf-command-init
-```
-Then edit `.workflow/config.yaml` — especially the `parallel` section for worktree settings.
-
-### Skipping a phase
-
-You can run phases out of order if needed. Just make sure the required state files exist:
-- `/wf-command-build` needs `current_task.yaml` (in the worktree)
-- `/wf-command-review` needs `current_task.yaml` + `review_ready.yaml` (in the worktree)
-
 ---
 
 ## Troubleshooting
+
+### "No sprint.yaml found"
+Run `/wf-command-swa` to produce `sprint.yaml` from the master backlog.
+
+### "No master_backlog.yaml found"
+Run `/wf-command-sa` to create the master backlog from the roadmap.
+
+### "No roadmap.yaml found"
+Run `/wf-command-strategist` to create a product roadmap.
 
 ### "No config.yaml found"
 Run `/wf-command-init` first to bootstrap the project.
 
 ### Hook keeps blocking edits
-Check which hook is firing from the error message. If it's the scope audit, you may need to update `files_to_touch` in the task contract. If it's the suppression scan, fix the underlying lint issue instead of suppressing it.
+Check which hook is firing from the error message. If it's the scope audit, you may need to update `files_to_touch` in the task contract. If it's the import direction check, the dependency rules in `COMPONENTS.yaml` need amending via `/wf-command-sa`. If it's the suppression scan, fix the underlying lint issue instead of suppressing it.
 
 ### "HALT: Same command 3 times"
 Claude is in a retry loop. The root-cause-tracing skill will be invoked. If you want to override, clear `/tmp/.workflow-cmd-history`.
@@ -348,11 +491,11 @@ Run `git worktree list` to see active worktrees. Remove any under the configured
 git worktree remove <path> --force
 ```
 
-### Merge conflict blocks a task
-The orchestrator aborts the merge and escalates. Resolve the conflict manually in the worktree, then push. The pipeline will detect the resolution.
+### Design issue blocks a task
+The task is halted — it cannot be retried. Resolve the design issue via `/wf-command-sa` (architecture change) or `/wf-command-swa` (task re-plan), then re-run the pipeline.
 
 ### All tasks in a stage are blocked
-If every task in remaining stages depends on an escalated task, the pipeline transitions to `idle` and reports what's blocked. Resolve the escalated task first, then re-run `/wf-command-pipeline`.
+If every task in remaining stages depends on an escalated or design-issue task, the pipeline transitions to `retrospective` then `idle`. Resolve the blocking issue first, then re-run `/wf-command-pipeline`.
 
 ### Want to start fresh on a task
 Delete the task's worktree (`git worktree remove <path>`), clear its entry from `pipeline_state.yaml` task_states, and re-plan.

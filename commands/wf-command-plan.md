@@ -1,9 +1,15 @@
 ---
 name: wf-command-plan
-description: "Run the plan phase — produce an agent-executable task contract from the sprint backlog"
+description: "[DEPRECATED] Use /wf-command-swa instead — task contracts are now produced by the Software Architect"
 ---
 
-Load and execute the plan skill.
+> **DEPRECATED:** This command has been replaced:
+> - Task contract creation → `/wf-command-swa` (Software Architect) produces `sprint.yaml` with full inline contracts
+> - Worktree/branch setup → The pipeline orchestrator handles this automatically from `sprint.yaml`
+>
+> The old plan skill is kept for backward compatibility but is no longer invoked by the pipeline.
+
+Legacy usage (if needed):
 
 1. Read `.workflow/config.yaml` for project paths and settings
 2. Read the sprint file to identify the next incomplete task

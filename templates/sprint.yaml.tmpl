@@ -1,0 +1,48 @@
+# sprint.yaml — Sprint file with full task contracts
+# Produced by the Software Architect (/wf-command-swa).
+# Consumed by /wf-command-pipeline (orchestrator reads this directly).
+
+sprint_id: ""
+goal: ""
+source_backlog_sprint: ""    # Which master_backlog sprint this was derived from
+created_at: ""
+
+tasks:
+  # Each task is a full contract inline — acceptance criteria, files_to_touch,
+  # testing mandate, dependencies. The pipeline reads these directly.
+  #
+  # - id: "S1.1"
+  #   title: "Task title"
+  #   status: "pending"            # pending | in_progress | done | blocked | escalated
+  #   component: "component-name"
+  #   depends_on: []
+  #   risk: "low"                  # low | medium | high
+  #
+  #   acceptance_criteria:
+  #     - "When X happens, Y should result"
+  #
+  #   files_to_touch:
+  #     - "src/module/file.ts"
+  #     - "src/module/file.test.ts"
+  #
+  #   context_to_load:
+  #     - "docs/CONVENTIONS.md"
+  #     - "src/module/types.ts"
+  #
+  #   out_of_scope:
+  #     - "Do NOT modify the database schema"
+  #
+  #   testing_mandate:
+  #     unit:
+  #       - "Happy path: valid input returns expected output"
+  #       - "Error path: invalid input returns error"
+  #     integration: []
+  #     e2e: []
+  #
+  #   doc_updates_required:
+  #     - path: "docs/API.md"
+  #       action: "Add entry for new endpoint"
+  #       category: "codebase"
+  #
+  #   implementation_notes: |
+  #     Guidance for the developer.

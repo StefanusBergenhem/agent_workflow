@@ -1,0 +1,20 @@
+# COMPONENTS.yaml — Component registry and architecture governance
+# Place this file in the project root.
+# Maintained by the Solution Architect (/wf-command-sa).
+
+components:
+  # One entry per top-level module/package. Example:
+  #
+  # auth:
+  #   path: src/auth/
+  #   owns: [authentication, session-management, jwt-validation]
+  #   exposes: [AuthMiddleware, SessionStore]
+  #   depends_on: [database, user-service]
+  #   constraints:
+  #     max_source_files: 20
+  #     max_exported_symbols: 15
+
+dependency_rules:
+  # Directional dependency constraints. Example:
+  # - "ui must not import from database"
+  # - "no circular dependencies"

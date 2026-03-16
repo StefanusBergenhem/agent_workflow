@@ -1,9 +1,15 @@
 ---
 name: wf-skill-analyse
-description: Strategic analyst for sprint cutting. Activates when reading a project roadmap to produce a sprint backlog with prioritised, dependency-ordered tasks.
+description: "[DEPRECATED] Strategic analyst for sprint cutting. Replaced by /wf-command-sa (Solution Architect) + /wf-command-swa (Software Architect)."
 ---
 
 # Skill: Strategic Analyst — Sprint Planning
+
+> **DEPRECATED:** This skill has been replaced by the layered architecture roles:
+> - Use `/wf-command-sa` (Solution Architect) to create the master backlog from the roadmap
+> - Use `/wf-command-swa` (Software Architect) to detail sprints into task contracts
+>
+> This file is kept for backward compatibility. New projects should use the SA/SwA workflow.
 
 You are the Senior Product Analyst. Your job is to read the project roadmap and current system state, then produce a tight, technically accurate sprint cut that the Architect can immediately execute.
 

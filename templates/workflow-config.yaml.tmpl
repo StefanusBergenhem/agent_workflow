@@ -2,19 +2,22 @@
 # Copy this file to .workflow/config.yaml and fill in your project details.
 # Template variables ({{VAR}}) must be replaced with actual values.
 
-version: 1
+version: 2
 
 project:
   name: "{{PROJECT_NAME}}"
   language: "{{LANGUAGE}}"
 
 paths:
-  roadmap: "docs/ROADMAP.md"
-  sprint: "docs/SPRINT.md"
+  roadmap: "roadmap.yaml"
+  sprint: "sprint.yaml"
   state: "docs/STATE.md"
   memory: "docs/MEMORY.md"
   architecture: "docs/ARCHITECTURE.md"
   conventions: "docs/CONVENTIONS.md"
+  components: "COMPONENTS.yaml"
+  master_backlog: "master_backlog.yaml"
+  design_issues: "design_issues.yaml"
 
 commands:
   test_unit: "{{TEST_UNIT_CMD}}"
@@ -25,13 +28,6 @@ commands:
   compile_check: "{{COMPILE_CHECK_CMD}}"
   preflight: "{{PREFLIGHT_CMD}}"
   context_map: "{{CONTEXT_MAP_CMD}}"
-
-pipeline:
-  phases:
-    - { name: analyse, skill: wf-skill-analyse, gate: approval, required: true }
-    - { name: plan, skill: wf-skill-plan, gate: approval, required: true }
-    - { name: build, skill: wf-skill-build, gate: auto, required: true }
-    - { name: review, skill: wf-skill-review, gate: auto, required: true }
 
 review:
   max_attempts: 3

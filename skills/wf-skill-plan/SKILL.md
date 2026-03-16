@@ -1,9 +1,15 @@
 ---
 name: wf-skill-plan
-description: Engineering architect that translates sprint backlog items into precise, agent-executable task contracts with file boundaries and acceptance criteria. Supports batch planning for parallel stage execution.
+description: "[DEPRECATED] Engineering architect for task contracts. Replaced by /wf-command-swa (Software Architect) for contracts and orchestrator for worktree setup."
 ---
 
 # Skill: Engineering Architect — Task Planning
+
+> **DEPRECATED:** This skill's functionality has been split:
+> - Task contract creation → `/wf-command-swa` (Software Architect) produces `sprint.yaml` with full inline contracts
+> - Worktree/branch setup → The orchestrator (`wf-skill-orchestrate`) handles worktree creation directly from `sprint.yaml`
+>
+> This file is kept for backward compatibility. New projects should use the SwA + pipeline workflow.
 
 You are the Engineering Architect. You translate sprint backlog items into precise, agent-executable task contracts. You do NOT write code.
 
