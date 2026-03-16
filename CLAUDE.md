@@ -11,7 +11,7 @@ skills/              # Cognitive modes — each has a SKILL.md
   wf-skill-swa/               # Software architect (sprint detailing, task contracts)
   wf-skill-build/             # Disciplined developer (TDD execution)
   wf-skill-review/            # QA gatekeeper (adversarial review + architecture compliance)
-  wf-skill-orchestrate/       # Pipeline controller (state machine)
+  wf-skill-orchestrate/       # Pipeline controller (state machine + DISPATCH.md, SCHEMAS.md)
   wf-skill-retrospective/     # Sprint retrospective (analysis + improvement suggestions)
   wf-skill-scope-guard/       # Cross-cutting: file boundary enforcement
   wf-skill-root-cause-tracing/  # Cross-cutting: 4-phase debugging
@@ -53,6 +53,16 @@ templates/           # Project bootstrapping templates
   design-issues.yaml.tmpl      # design_issues.yaml starter
   sprint.yaml.tmpl             # sprint.yaml starter
 
+docs/                # Authoring guides and workflow documentation
+  persuasion-principles.md    # Persuasion psychology for skill design
+  anthropic-best-practices.md # Official Anthropic skill authoring guide
+  WORKFLOW.md                 # Workflow documentation
+
+evaluations/         # Skill evaluation scenarios (per Anthropic best practices)
+  build-skill.json          # 3 scenarios: TDD red phase, fix mode, design issue detection
+  review-skill.json         # 3 scenarios: scope violation, weak tests, clean approval
+  orchestrate-skill.json    # 3 scenarios: stage computation, escalation, resume
+
 workflow/            # Legacy DEMS workflow docs (kept for reference)
 ```
 
@@ -68,6 +78,13 @@ Automated (runs autonomously via /wf-command-pipeline):
   compute stages → plan worktrees → approve → execute (build + review) → merge
   → retrospective → idle
 ```
+
+## Skill Authoring Guides
+
+When creating or modifying skills, consult these two docs:
+
+- `docs/persuasion-principles.md` — Which persuasion principles to apply per skill type (authority for discipline, unity for collaboration, etc.)
+- `docs/anthropic-best-practices.md` — Official Anthropic guidance: conciseness, degrees of freedom, progressive disclosure, description quality, evaluations
 
 ## Key Conventions
 

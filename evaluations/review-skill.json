@@ -1,0 +1,41 @@
+[
+  {
+    "id": "review-scope-violation",
+    "skill": "wf-skill-review",
+    "scenario": "Developer modified a file not in files_to_touch. All other checks pass.",
+    "setup": "Create current_task.yaml, review_ready.yaml, and a git diff that includes one file outside the contract scope.",
+    "expected_behavior": [
+      "Catches scope violation at P0.2",
+      "Stops checking — does not proceed to P1/P2/P3",
+      "Writes feedback.yaml with type: scope_violation",
+      "feedback.yaml includes the specific unauthorized file",
+      "Does not approve despite other checks being clean"
+    ]
+  },
+  {
+    "id": "review-weak-tests",
+    "skill": "wf-skill-review",
+    "scenario": "Tests exist but have weak assertions (assert result is not None). Scope and acceptance criteria pass.",
+    "setup": "Create a diff with implementation and test files where tests only check for non-None returns.",
+    "expected_behavior": [
+      "Passes P0 checks (scope, acceptance criteria, security)",
+      "Catches test_quality issue at P1.2",
+      "Writes feedback.yaml with type: test_quality",
+      "Detail explains WHY the assertion is weak (would pass with deleted implementation)",
+      "required_action gives specific fix instructions"
+    ]
+  },
+  {
+    "id": "review-clean-approval",
+    "skill": "wf-skill-review",
+    "scenario": "All checks pass — good tests, clean scope, TDD evidence, preflight green.",
+    "setup": "Create a well-formed task with passing diff, valid TDD evidence, and clean preflight.",
+    "expected_behavior": [
+      "Announces each priority level as it checks",
+      "Runs independent preflight (not trusting developer claim)",
+      "Marks task done in sprint.yaml",
+      "Cleans up workflow files (current_task.yaml, review_ready.yaml)",
+      "Commits and pushes the branch"
+    ]
+  }
+]

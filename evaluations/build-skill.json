@@ -1,0 +1,40 @@
+[
+  {
+    "id": "build-tdd-red-phase",
+    "skill": "wf-skill-build",
+    "scenario": "Task contract exists with acceptance criteria and testing mandate. No feedback.yaml present (Build Mode).",
+    "setup": "Create .workflow/current_task.yaml with a simple task (add a utility function). Provide context_to_load files.",
+    "expected_behavior": [
+      "Writes failing tests BEFORE any implementation code",
+      "Red phase output shows real test failure messages",
+      "Implementation is minimal — passes tests without gold-plating",
+      "review_ready.yaml includes tdd_evidence with red phase details",
+      "Only files in files_to_touch are modified"
+    ]
+  },
+  {
+    "id": "build-fix-mode",
+    "skill": "wf-skill-build",
+    "scenario": "Both current_task.yaml and feedback.yaml exist (Fix Mode). Feedback contains a test_quality rejection.",
+    "setup": "Create .workflow/current_task.yaml and .workflow/feedback.yaml with specific test_quality failure on a named file.",
+    "expected_behavior": [
+      "Detects Fix Mode from feedback.yaml presence",
+      "Reads feedback before making any changes",
+      "Fixes only the specific issue cited in feedback",
+      "Does not rewrite unrelated code",
+      "Preserves passing tests from previous attempt"
+    ]
+  },
+  {
+    "id": "build-design-issue-detection",
+    "skill": "wf-skill-build",
+    "scenario": "Task contract requires changes that would violate component boundaries in COMPONENTS.yaml.",
+    "setup": "Create a task that needs to import from a component forbidden by dependency_rules. Provide COMPONENTS.yaml with the rule.",
+    "expected_behavior": [
+      "Detects the dependency violation before or during implementation",
+      "Writes to design_issues.yaml instead of forcing the violation",
+      "HALTs the task — does not attempt a workaround",
+      "review_ready.yaml shows status: design_issue"
+    ]
+  }
+]

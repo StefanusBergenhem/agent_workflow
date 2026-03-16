@@ -1,0 +1,41 @@
+[
+  {
+    "id": "orchestrate-stage-computation",
+    "skill": "wf-skill-orchestrate",
+    "scenario": "sprint.yaml has 6 tasks with dependencies forming 3 stages. Pipeline is idle.",
+    "setup": "Create sprint.yaml with tasks S1.1-S1.6 where S1.3 depends on S1.1, S1.4 depends on S1.2, S1.5 depends on S1.3, S1.6 depends on S1.4 and S1.5.",
+    "expected_behavior": [
+      "Detects idle state and runs resume detection",
+      "Computes 3 stages via topological sort",
+      "Stage 1: [S1.1, S1.2], Stage 2: [S1.3, S1.4], Stage 3: [S1.5, S1.6]",
+      "Writes stage definitions to pipeline_state.yaml",
+      "Transitions to planning_worktrees for stage 1"
+    ]
+  },
+  {
+    "id": "orchestrate-escalation-propagation",
+    "skill": "wf-skill-orchestrate",
+    "scenario": "Task S1.1 in stage 1 reaches max_attempts (3 rejections). S1.3 in stage 2 depends on S1.1.",
+    "setup": "Pipeline in executing_stage with S1.1 at attempt_counter=2, review returns REJECTED.",
+    "expected_behavior": [
+      "Increments attempt_counter to 3, which equals max_attempts",
+      "Marks S1.1 as escalated (does NOT retry)",
+      "Scans later stages for dependents — finds S1.3",
+      "Adds S1.3 to blocked_tasks with reason referencing S1.1",
+      "Reports escalation to human, other stage 1 tasks continue"
+    ]
+  },
+  {
+    "id": "orchestrate-resume-mid-sprint",
+    "skill": "wf-skill-orchestrate",
+    "scenario": "Pipeline was interrupted. sprint.yaml exists with incomplete tasks, stages are computed, but no stage_manifest.yaml.",
+    "setup": "Create sprint.yaml with some tasks pending, pipeline_state.yaml with stages.definitions populated, current_phase: idle.",
+    "expected_behavior": [
+      "Resume detection finds sprint with incomplete tasks",
+      "Finds stages already computed in pipeline_state.yaml",
+      "Transitions to planning_worktrees (not computing_stages)",
+      "Appends 'Resumed mid-sprint' to history log",
+      "Does not recompute stages"
+    ]
+  }
+]
