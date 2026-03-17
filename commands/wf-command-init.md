@@ -33,35 +33,49 @@ Scan the project root for:
 Record detected language and framework in config.
 
 ### 3. Generate .workflow/config.yaml
-Pre-fill with detected values:
+Use `templates/workflow-config.yaml.tmpl` as the source. Substitute template variables with detected values:
 ```yaml
+version: 2
+
 project:
   name: <detected from directory name or manifest>
   language: <detected>
-  framework: <detected>
 
 paths:
-  roadmap: "docs/ROADMAP.md"       # Adjust to project conventions
-  sprint: "doc/SPRINT.md"
-  state: "doc/STATE.md"
-  architecture: []                 # List of architecture doc paths
-  codebase: []                     # List of codebase doc paths
-  components: "COMPONENTS.yaml"    # Component registry
-  master_backlog: "master_backlog.yaml"  # Master backlog
+  roadmap: "roadmap.yaml"
+  sprint: "sprint.yaml"
+  state: "docs/STATE.md"
+  memory: "docs/MEMORY.md"
+  architecture: "docs/ARCHITECTURE.md"
+  conventions: "docs/CONVENTIONS.md"
+  components: "COMPONENTS.yaml"
+  master_backlog: "master_backlog.yaml"
+  design_issues: "design_issues.yaml"
 
 commands:
-  test: <detected test command>    # e.g., "go test ./...", "npm test", "cargo test"
-  lint: <detected lint command>
-  build: <detected build command>
-  preflight: ""                    # Custom preflight script path
+  test_unit: <detected>            # e.g., "go test ./...", "npm test", "cargo test"
+  test_integration: ""             # fill in if applicable
+  test_e2e: ""                     # fill in if applicable
+  lint: <detected>
+  type_check: <detected>           # e.g., "tsc --noEmit"
+  compile_check: <detected>        # e.g., "go build ./..."
+  preflight: <detected or "">      # combined pre-commit check
+  context_map: ""                  # command to generate dependency map
 
-workflow:
-  max_review_attempts: 3
-  max_files_per_task: 3
-  max_lines_per_task: 150
-  task_file: "current_task.yaml"
-  review_file: "review_ready.yaml"
-  feedback_file: "feedback.yaml"
+review:
+  max_attempts: 3
+  escalation: halt
+
+parallel:
+  enabled: true
+  worktree_base: ".claude/worktrees"
+  merge_strategy: "branch-push"
+  max_concurrent_tasks: 4
+
+task_sizing:
+  max_files_to_touch: 3
+  max_context_files: 5
+  max_estimated_lines: 150
 ```
 
 ### 4. Initialize pipeline state

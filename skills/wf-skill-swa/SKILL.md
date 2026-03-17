@@ -144,7 +144,30 @@ issues:
 
 Design issues do NOT block sprint creation. Mark affected tasks with `status: "blocked"` and a note referencing the issue ID. Other tasks proceed normally.
 
-### Step 6 — Assemble sprint.yaml
+### Step 6 — Determine Task Dependencies
+
+For each task, determine which other tasks in the sprint must complete before it can start. Populate `depends_on` with those task IDs.
+
+**Dependency exists when:**
+- Task B modifies a file that Task A creates (B depends on A)
+- Task B's `context_to_load` includes a file that Task A creates or modifies in `files_to_touch`
+- Task B extends an interface or type that Task A introduces
+- Task B's tests require functionality that Task A implements
+
+**Dependency does NOT exist when:**
+- Tasks touch different files in the same component (parallel within component is fine)
+- Tasks share read-only context files (both loading the same existing file)
+- The relationship is merely thematic (same feature area but independent work)
+
+**Rules:**
+- Check every pair of tasks — do not assume independence
+- If A creates `src/auth/types.ts` and B imports from it, B depends on A — even if B also modifies other files
+- Keep the graph as shallow as possible — avoid unnecessary chains. If A and B are truly independent, leave `depends_on: []` so they run in parallel
+- Detect cycles — if you find a circular dependency, split one of the tasks to break it
+
+The orchestrator will use `depends_on` to compute parallel execution stages via topological sort. Tasks with no dependencies run first (Stage 1), tasks depending only on Stage 1 tasks run next (Stage 2), etc. Getting this wrong means either: tasks fail because a dependency wasn't built yet, or tasks wait unnecessarily because a false dependency serializes them.
+
+### Step 7 — Assemble sprint.yaml
 
 Combine all task contracts into `sprint.yaml`:
 
@@ -161,18 +184,19 @@ tasks:
     # ...
 ```
 
-### Step 7 — Present for Approval
+### Step 8 — Present for Approval
 
 Present to the human:
 - Sprint summary (goal, task count, total scope estimate)
 - Per-task summaries (what, why, approach, scope, risks)
 - Any design issues found
 - Any tasks that were split and why
-- Dependency graph between tasks
+- Dependency graph showing `depends_on` relationships
+- **Stage preview:** group tasks into stages (Stage 1 = no deps, Stage 2 = depends only on Stage 1, etc.) so the human can verify the parallelization plan before the orchestrator computes it
 
 Wait for human approval before writing.
 
-### Step 8 — Write Artifacts
+### Step 9 — Write Artifacts
 
 On approval:
 1. Write `sprint.yaml` to the project root

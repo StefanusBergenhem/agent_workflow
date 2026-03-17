@@ -13,7 +13,9 @@ paths:
   sprint: "sprint.yaml"
   state: "docs/STATE.md"
   memory: "docs/MEMORY.md"
-  architecture: "docs/ARCHITECTURE.md"
+  architecture_docs:             # Globs — all matching files are read by SA
+    - "**/ARCHITECTURE.md"
+    - "docs/adrs/*.md"
   conventions: "docs/CONVENTIONS.md"
   components: "COMPONENTS.yaml"
   master_backlog: "master_backlog.yaml"

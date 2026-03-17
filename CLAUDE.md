@@ -18,8 +18,6 @@ skills/              # Cognitive modes — each has a SKILL.md
   wf-skill-verification/      # Cross-cutting: evidence-based completion
   wf-skill-receiving-feedback/  # Cross-cutting: processing rejections
   wf-skill-testing-anti-patterns/  # Cross-cutting: test quality rules
-  wf-skill-analyse/           # [DEPRECATED] Replaced by SA + SwA
-  wf-skill-plan/              # [DEPRECATED] Replaced by SwA + orchestrator
 
 commands/            # Slash commands (thin wrappers invoking skills)
   wf-command-strategist.md    # Product strategy session
@@ -30,8 +28,6 @@ commands/            # Slash commands (thin wrappers invoking skills)
   wf-command-review.md        # Manual review trigger
   wf-command-status.md        # Pipeline status report
   wf-command-init.md          # Project bootstrap (standard + deep mode)
-  wf-command-analyse.md       # [DEPRECATED]
-  wf-command-plan.md          # [DEPRECATED]
 
 hooks/               # Mechanical enforcement (shell scripts)
   hooks.json                   # Hook config (merges into settings.json)
