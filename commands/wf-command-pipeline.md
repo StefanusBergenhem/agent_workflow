@@ -9,4 +9,4 @@ Run the automated build/review pipeline.
 2. Verify `sprint.yaml` exists — if not, HALT and suggest running `/wf-command-swa` first
 3. Load and execute the orchestrate skill (`skills/wf-skill-orchestrate/SKILL.md`) — it defines the full state machine
 
-The pipeline runs autonomously: compute stages → plan worktrees → execute (build + review) → retrospective.
+The pipeline runs fully autonomously with no human approval gates: compute stages → plan worktrees → execute (build + review) → retrospective → publish. Error-path halts (merge conflicts, design issues, max-retry escalations) still pause for human intervention.

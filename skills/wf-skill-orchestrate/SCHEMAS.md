@@ -6,7 +6,7 @@
 # .workflow/pipeline_state.yaml
 current_phase: "idle"
 # Valid: idle | creating_sprint_branch | computing_stages | planning_worktrees |
-#        awaiting_stage_approval | executing_stage | stage_complete |
+#        executing_stage | stage_complete |
 #        retrospective | publishing | escalated
 
 sprint_id: ""                    # Set from sprint.yaml
@@ -33,6 +33,10 @@ blocked_tasks:
 design_issues:
   # Tasks halted due to design-level problems.
   # "S1.3": { issue_id: "DI-001", summary: "Auth/DB boundary violation" }
+
+stage_summaries:
+  # Compact summaries written at stage boundaries (context hygiene).
+  # 1: { completed: ["S1.1", "S1.2"], escalated: [], design_issues: [], merged_branches: ["s1.1-add-parser"] }
 
 max_attempts: 3                  # Escalate when attempt_counter >= max_attempts
 

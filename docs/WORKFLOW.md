@@ -69,7 +69,6 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
   → compute stages (dependency sort)
   → for each stage:
       → create worktrees + branches per task (from sprint branch)
-      → human approves stage
       → spawn parallel build agents
       → spawn review agent per completed build
       → merge approved tasks to sprint branch
@@ -102,7 +101,7 @@ The orchestrator runs **resume detection first**:
 After resume detection:
 1. Creates a sprint branch from main (`sprint/<sprint-id>`)
 2. Computes dependency stages (topological sort of sprint tasks)
-3. For each stage: creates worktrees (from sprint branch), pauses for your approval, then executes all tasks in parallel
+3. For each stage: creates worktrees (from sprint branch), then executes all tasks in parallel
 4. Approved tasks merge to the sprint branch immediately; rejected tasks retry up to 3 times
 5. Design issues halt the affected task (no retries — requires architect fix)
 6. After all stages: runs retrospective, then pushes sprint branch and creates a PR to main
@@ -182,7 +181,7 @@ Diagrams are ephemeral conversation tools — they help you see the system durin
 
 **What it does:** Reads `sprint.yaml` and executes the full build→review→merge pipeline.
 
-**Runs automatically** after you approve each stage.
+**Runs fully autonomously** — no human approval gates during execution.
 
 **Output:** Sprint branch with merged code, `retrospective/<sprint-id>.md`, and a pull request to main.
 
@@ -316,7 +315,7 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 
 ```
 idle → creating_sprint_branch → computing_stages → planning_worktrees →
-  awaiting_stage_approval → executing_stage → stage_complete →
+  executing_stage → stage_complete →
     [more stages?] → planning_worktrees (next stage)
     [all done?] → retrospective → publishing (push + PR) → idle
 ```
@@ -360,6 +359,10 @@ parallel:
 4. **Stage completion** — When all tasks in a stage are completed, escalated, or halted (design issue), worktrees are cleaned up and the next stage begins.
 
 5. **Publishing** — After retrospective, the sprint branch is pushed and a PR is created to main with a sprint summary.
+
+### Context management
+
+The orchestrator uses a self-compacting strategy to manage context usage across multi-stage sprints. Sub-agent output is piped to `/tmp/pipeline-<sprint_id>-<task_id>.log` files — the orchestrator reads only the verdict, not the full output. At each stage boundary, a compact summary is written to `pipeline_state.yaml` under `stage_summaries`, and prior stage details are not referenced again. This keeps the orchestrator's context window usage manageable even for sprints with many stages.
 
 ### Merge protocol
 

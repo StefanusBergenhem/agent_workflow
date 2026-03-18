@@ -26,7 +26,7 @@ You are the Pipeline Controller. You are a thin state machine executor. You read
 ### Pipeline Flow
 
 ```
-idle → creating_sprint_branch → computing_stages → planning_worktrees → awaiting_stage_approval →
+idle → creating_sprint_branch → computing_stages → planning_worktrees →
   executing_stage → stage_complete →
     [more stages?] → planning_worktrees (next stage)
     [all done?] → retrospective → publishing → idle
@@ -49,7 +49,6 @@ build → review → APPROVED → merge to sprint branch, mark completed
 | `creating_sprint_branch` | Creating a dedicated branch for the sprint. | Create branch from main, record in state. See [GIT_OPERATIONS.md](GIT_OPERATIONS.md). |
 | `computing_stages` | Computing dependency stages from sprint.yaml tasks. | Run stage computation. |
 | `planning_worktrees` | Creating git worktrees for all tasks in the current stage. | See [GIT_OPERATIONS.md](GIT_OPERATIONS.md). |
-| `awaiting_stage_approval` | Stage worktrees ready, waiting for human to approve execution. | Wait for human gate. |
 | `executing_stage` | Tasks in the current stage are building/reviewing in parallel worktrees. | Monitor task progress. |
 | `stage_complete` | All tasks in stage are completed or escalated. | Check for next stage or retrospective. |
 | `retrospective` | Running sprint retrospective analysis. | Spawn retrospective sub-agent. |
@@ -73,7 +72,7 @@ Key fields: `current_phase`, `sprint_branch`, `stages.definitions`, `task_states
 1. Check if `sprint.yaml` exists in the project root.
 2. If the sprint file exists and contains incomplete tasks (status != `done`):
    - Check if `sprint_branch` is set in `pipeline_state.yaml` — if not, transition to `creating_sprint_branch`.
-   - Check if `.workflow/stage_manifest.yaml` exists → if yes, transition directly to `awaiting_stage_approval` (worktrees are ready).
+   - Check if `.workflow/stage_manifest.yaml` exists → if yes, transition directly to `executing_stage` (worktrees are ready).
    - Check if `stages.definitions` is populated in `pipeline_state.yaml` → if yes, transition to `planning_worktrees`.
    - Otherwise → transition to `computing_stages` (sprint exists, stages not yet computed).
    - Update `pipeline_state.yaml` with the new phase and a `reason: "Resumed mid-sprint"` history entry.
@@ -124,8 +123,7 @@ When in `planning_worktrees`:
    - Run baseline preflight in each worktree
 4. Write `.workflow/stage_manifest.yaml` listing all worktrees and contracts.
 5. Update `task_states` with branch and worktree path for each task.
-6. Transition to `awaiting_stage_approval`.
-7. Present all task contracts to the human as a batch for approval.
+6. Transition to `executing_stage`.
 
 ---
 
@@ -172,9 +170,45 @@ When a stage reaches `stage_complete`:
 
 1. **Clean up worktrees** — see [GIT_OPERATIONS.md](GIT_OPERATIONS.md).
 2. **Update the stage status** in `pipeline_state.yaml` to `completed`.
-3. **Check for next stage:**
+3. **Write stage summary** — follow the Context Hygiene Protocol (see below). Write compact `stage_summaries` entry to `pipeline_state.yaml`.
+4. **Check for next stage:**
    - If `stages.current < stages.total`: increment `stages.current`, transition to `planning_worktrees`.
    - If all stages complete: transition to `retrospective`.
+
+---
+
+## Context Hygiene Protocol
+
+The orchestrator runs as a single invocation across all stages. To keep context usage manageable, follow these rules strictly.
+
+### During Stage Execution
+
+- Pipe all sub-agent output to `/tmp/pipeline-<sprint_id>-<task_id>.log`. Read only the outcome (APPROVED/REJECTED/DESIGN_ISSUE/ESCALATED), not the full output.
+- Do not echo sub-agent diffs, test output, or review details — record only the status in `task_states`.
+- When dispatching sub-agents, capture their full output in log files. Extract and retain only the verdict and any file paths needed for merge.
+
+### At Stage Boundaries
+
+After `stage_complete`, before proceeding to `planning_worktrees` for the next stage:
+
+1. **Re-read this skill file** (`skills/wf-skill-orchestrate/SKILL.md`) from disk. This refreshes the orchestration instructions in the context window, protecting against compression discarding them during long-running sprints.
+2. Write a compact stage summary to `pipeline_state.yaml` under `stage_summaries`:
+   ```yaml
+   stage_summaries:
+     1:
+       completed: ["S1.1", "S1.2"]
+       escalated: ["S1.3"]
+       design_issues: []
+       merged_branches: ["s1.1-add-parser", "s1.2-update-config"]
+   ```
+3. This summary is the **only** record needed for subsequent stages. All prior dispatch details, sub-agent outputs, and intermediate states are no longer needed.
+4. Announce: "Stage N complete. Summary written to pipeline_state.yaml. Proceeding to stage N+1."
+
+### Hard Rules
+
+- Never reference build/review details from a prior stage when executing the current stage.
+- Never re-read sub-agent log files from prior stages.
+- The stage summary in `pipeline_state.yaml` is the single source of truth for completed stages.
 
 ---
 
@@ -190,17 +224,6 @@ When all stages are complete (or all remaining tasks are blocked/escalated):
 ---
 
 ## Gate Handling
-
-### Human Gates
-
-One transition requires explicit human approval:
-
-**Planning Worktrees → Executing Stage.** After worktrees and task contracts are prepared, the human must approve before execution begins.
-
-- Present the task summaries as a batch
-- Ask for explicit approval: "Approve to proceed?"
-- Accept: "go", "approved", "yes", "lgtm", or similar affirmative
-- If the human requests changes, HALT — changes to task contracts require re-running `/wf-command-swa`
 
 ### Automatic Gates
 
@@ -237,10 +260,11 @@ One transition requires explicit human approval:
 - **Thin controller.** Never perform analysis, planning, building, or reviewing. Only manage state transitions and context assembly.
 - **Minimal context.** Each sub-agent gets ONLY its SKILL.md + required state files + context_to_load.
 - **State is persistent.** All state lives in `pipeline_state.yaml`. The orchestrator is stateless between dispatches.
-- **Gates are mandatory.** Human gates cannot be skipped. Automatic gates cannot be overridden.
+- **Automatic gates are mandatory and cannot be overridden.** Error-path escalations (merge conflicts, design issues, max-retry) require human intervention.
 - **Max 3 build-review loops per task.** Escalate on the 4th attempt.
 - **Design issues halt tasks.** Never retry a task with a design issue. Requires architect intervention.
 - **Append-only history.** Never delete or modify history entries in `pipeline_state.yaml`.
+- **Context hygiene is mandatory.** Sub-agent output goes to /tmp log files, not inline. At stage boundaries, write a compact stage summary and do not reference prior stage details.
 - **No auto-conflict resolution.** Merge conflicts always escalate to the human.
 - **Escalation does not block the stage.** Other tasks continue. Only dependents in later stages are blocked.
 - **Worktree cleanup is mandatory.** Never leave orphaned worktrees.
