@@ -26,15 +26,15 @@ You are the Pipeline Controller. You are a thin state machine executor. You read
 ### Pipeline Flow
 
 ```
-idle → computing_stages → planning_worktrees → awaiting_stage_approval →
+idle → creating_sprint_branch → computing_stages → planning_worktrees → awaiting_stage_approval →
   executing_stage → stage_complete →
     [more stages?] → planning_worktrees (next stage)
-    [all done?] → retrospective → idle
+    [all done?] → retrospective → publishing → idle
 ```
 
 Within `executing_stage` (parallel per task):
 ```
-build → review → APPROVED → merge to main, mark completed
+build → review → APPROVED → merge to sprint branch, mark completed
                → REJECTED → increment attempt_counter
                            → attempt_counter < max_attempts → build (Fix Mode)
                            → attempt_counter >= max_attempts → escalated
@@ -45,20 +45,22 @@ build → review → APPROVED → merge to main, mark completed
 
 | State | Description | Next Action |
 |:------|:------------|:------------|
-| `idle` | No active work or pipeline entry point. | Run resume detection: if sprint.yaml exists with incomplete tasks, resume mid-sprint. Otherwise HALT — sprint.yaml must be created via `/wf-command-swa` first. |
-| `computing_stages` | Computing dependency stages from sprint.yaml tasks. | Run stage computation |
-| `planning_worktrees` | Creating git worktrees and branches for all tasks in the current stage. | Create worktrees from sprint.yaml contracts |
-| `awaiting_stage_approval` | Stage worktrees ready, waiting for human to approve execution. | Wait for human gate |
-| `executing_stage` | Tasks in the current stage are building/reviewing in parallel worktrees. | Monitor task progress |
-| `stage_complete` | All tasks in stage are completed or escalated. | Check for next stage or retrospective |
-| `retrospective` | Running sprint retrospective analysis. | Spawn retrospective sub-agent |
-| `escalated` | Critical halt requiring human intervention. | Human intervention required |
+| `idle` | No active work or pipeline entry point. | Run resume detection. |
+| `creating_sprint_branch` | Creating a dedicated branch for the sprint. | Create branch from main, record in state. See [GIT_OPERATIONS.md](GIT_OPERATIONS.md). |
+| `computing_stages` | Computing dependency stages from sprint.yaml tasks. | Run stage computation. |
+| `planning_worktrees` | Creating git worktrees for all tasks in the current stage. | See [GIT_OPERATIONS.md](GIT_OPERATIONS.md). |
+| `awaiting_stage_approval` | Stage worktrees ready, waiting for human to approve execution. | Wait for human gate. |
+| `executing_stage` | Tasks in the current stage are building/reviewing in parallel worktrees. | Monitor task progress. |
+| `stage_complete` | All tasks in stage are completed or escalated. | Check for next stage or retrospective. |
+| `retrospective` | Running sprint retrospective analysis. | Spawn retrospective sub-agent. |
+| `publishing` | Pushing sprint branch and creating pull request. | See [GIT_OPERATIONS.md](GIT_OPERATIONS.md). |
+| `escalated` | Critical halt requiring human intervention. | Human intervention required. |
 
-### pipeline_state.yaml Schema
+### Schemas
 
-See [SCHEMAS.md](SCHEMAS.md) for the full schema and examples.
+See [SCHEMAS.md](SCHEMAS.md) for `pipeline_state.yaml` schema and examples.
 
-Key fields: `current_phase`, `stages.definitions`, `task_states`, `blocked_tasks`, `design_issues`, `max_attempts`, `history`.
+Key fields: `current_phase`, `sprint_branch`, `stages.definitions`, `task_states`, `blocked_tasks`, `design_issues`, `max_attempts`, `history`.
 
 ---
 
@@ -70,6 +72,7 @@ Key fields: `current_phase`, `stages.definitions`, `task_states`, `blocked_tasks
 
 1. Check if `sprint.yaml` exists in the project root.
 2. If the sprint file exists and contains incomplete tasks (status != `done`):
+   - Check if `sprint_branch` is set in `pipeline_state.yaml` — if not, transition to `creating_sprint_branch`.
    - Check if `.workflow/stage_manifest.yaml` exists → if yes, transition directly to `awaiting_stage_approval` (worktrees are ready).
    - Check if `stages.definitions` is populated in `pipeline_state.yaml` → if yes, transition to `planning_worktrees`.
    - Otherwise → transition to `computing_stages` (sprint exists, stages not yet computed).
@@ -116,13 +119,7 @@ When in `planning_worktrees`:
 2. **Filter out blocked tasks.** Check `blocked_tasks` and `design_issues` — skip any blocked tasks.
 3. For each task in the stage:
    - Read the task contract from `sprint.yaml`
-   - Derive branch name: `<task_id>-<short-description>`, all lowercase, hyphens only
-   - Create git worktree:
-     ```bash
-     git fetch origin
-     WORKTREE_BASE=$(grep -A1 'worktree_base' .workflow/config.yaml | tail -1 | tr -d ' "' || echo ".claude/worktrees")
-     git worktree add "${WORKTREE_BASE}/<branch-name>" -b <branch-name> origin/main
-     ```
+   - Create git worktree — see [GIT_OPERATIONS.md](GIT_OPERATIONS.md) for commands
    - Write `.workflow/current_task.yaml` in each worktree (extract the task's contract from sprint.yaml into the standard task contract format)
    - Run baseline preflight in each worktree
 4. Write `.workflow/stage_manifest.yaml` listing all worktrees and contracts.
@@ -134,8 +131,6 @@ When in `planning_worktrees`:
 
 ## Stage Execution
 
-### Executing a Stage
-
 When in `executing_stage`:
 
 1. **Read `.workflow/stage_manifest.yaml`** for the list of tasks, worktrees, and contracts.
@@ -146,95 +141,37 @@ When in `executing_stage`:
    - **If parallel enabled:** Launch build sub-agents for all tasks in the stage simultaneously, each in its own worktree. Respect `max_concurrent_tasks` — if more tasks than the limit, batch them.
    - **If parallel disabled (sequential fallback):** Run tasks one at a time: build → review → merge for each task before starting the next.
 
-4. **Per-task lifecycle within the stage:**
-   ```
-   pending → building → reviewing → completed (merge to main)
-                                   → rejected → building (Fix Mode, increment attempt_counter)
-                                   → design_issue → halted (write design_issues.yaml)
-                                   → attempt_counter >= max_attempts → escalated
-   ```
+4. **Monitor and update `task_states`** as each task progresses. Update `pipeline_state.yaml` after each task state change.
 
-5. **Monitor and update `task_states`** as each task progresses. Update `pipeline_state.yaml` after each task state change.
+5. **On task completion (review approved):** Execute the merge protocol — see [GIT_OPERATIONS.md](GIT_OPERATIONS.md).
 
-6. **On task completion (review approved):** Execute the merge protocol (see below).
+6. **On task escalation:** Mark the task as `escalated` in `task_states`. Run escalation propagation (see below). Other tasks in the current stage continue unaffected.
 
-7. **On task escalation:** Mark the task as `escalated` in `task_states`. Compute blocked dependents for later stages (see below). Other tasks in the current stage continue unaffected.
-
-8. **On design issue:** When a build or review sub-agent writes to `design_issues.yaml`:
+7. **On design issue:** When a build or review sub-agent writes to `design_issues.yaml`:
    - Mark the task as `design_issue` in `task_states`
    - Add entry to `design_issues` in `pipeline_state.yaml`
    - Do NOT retry — the issue is architectural, not code-level
    - Report the design issue to the human
-   - Other tasks in the current stage continue unaffected
-   - Compute blocked dependents in later stages
+   - Run escalation propagation for blocked dependents
 
-9. **Stage is complete** when all tasks are either `completed`, `escalated`, or `design_issue`. Transition to `stage_complete`.
-
-### Merge Protocol
-
-When a task's review is approved:
-
-1. **Navigate to the task's worktree.**
-
-2. **Commit and push** the branch:
-   ```bash
-   cd <worktree_path>
-   git push origin <branch>
-   ```
-
-3. **Merge to main:**
-   ```bash
-   git checkout main
-   git pull origin main
-   git merge <branch> --no-ff
-   ```
-
-4. **Conflict detection:** If the merge produces conflicts:
-   - Abort the merge: `git merge --abort`
-   - Mark the task as `merge_conflict` in `task_states`
-   - **Escalate to the human.** Present the conflicting files and branches.
-   - Do NOT auto-resolve conflicts. Do NOT force the merge.
-
-5. **On successful merge:**
-   - Push main: `git push origin main`
-   - Clean up the worktree: `git worktree remove <worktree_path>`
-   - Update `task_states` to `completed`
+8. **Stage is complete** when all tasks are either `completed`, `escalated`, or `design_issue`. Transition to `stage_complete`.
 
 ### Escalation Propagation
 
-When a task is escalated, blocked by design issue, or has a merge conflict:
+When a task is escalated, has a design issue, or has a merge conflict:
 
 1. Mark the task appropriately in `task_states`.
-
 2. **Scan all later stages** for tasks that `depends_on` the affected task.
-
-3. Add those tasks to `blocked_tasks`:
-   ```yaml
-   blocked_tasks:
-     "S1.6": { reason: "depends_on S1.5 which is escalated", blocked_by: "S1.5" }
-   ```
-
+3. Add those tasks to `blocked_tasks` with reason and `blocked_by` fields.
 4. **Transitively block** — if task A is blocked and task B depends on A, B is also blocked.
-
 5. Report the escalation and blocked tasks to the human.
 
 ### Stage Completion
 
 When a stage reaches `stage_complete`:
 
-1. **Clean up remaining worktrees** for the completed stage:
-   ```bash
-   git worktree remove <worktree_path> --force
-   ```
-   Do this for all worktrees in the stage, including escalated tasks.
-
-2. **Update the stage status** in `pipeline_state.yaml`:
-   ```yaml
-   stages:
-     definitions:
-       N: { tasks: [...], status: completed }
-   ```
-
+1. **Clean up worktrees** — see [GIT_OPERATIONS.md](GIT_OPERATIONS.md).
+2. **Update the stage status** in `pipeline_state.yaml` to `completed`.
 3. **Check for next stage:**
    - If `stages.current < stages.total`: increment `stages.current`, transition to `planning_worktrees`.
    - If all stages complete: transition to `retrospective`.
@@ -248,12 +185,7 @@ When all stages are complete (or all remaining tasks are blocked/escalated):
 1. Transition to `retrospective`.
 2. Spawn the retrospective sub-agent with its context envelope.
 3. The retrospective skill produces `retrospective/<sprint-id>.md`.
-4. On completion, transition to `idle`.
-5. Report sprint completion summary:
-   - Tasks completed vs planned
-   - Escalated/blocked tasks
-   - Design issues surfaced
-   - Link to retrospective report
+4. On completion, transition to `publishing`. See [GIT_OPERATIONS.md](GIT_OPERATIONS.md) for the publishing protocol.
 
 ---
 
@@ -263,69 +195,21 @@ When all stages are complete (or all remaining tasks are blocked/escalated):
 
 One transition requires explicit human approval:
 
-1. **Planning Worktrees → Executing Stage gate.** After worktrees and task contracts are prepared, the human must approve before execution begins. Present the task summaries as a batch and wait.
+**Planning Worktrees → Executing Stage.** After worktrees and task contracts are prepared, the human must approve before execution begins.
 
-**Gate protocol:**
-- Present the task summaries to the human
-- Ask for explicit approval: "Approve to proceed?" or equivalent
+- Present the task summaries as a batch
+- Ask for explicit approval: "Approve to proceed?"
 - Accept: "go", "approved", "yes", "lgtm", or similar affirmative
 - If the human requests changes, HALT — changes to task contracts require re-running `/wf-command-swa`
-- If the human rejects, update state to reflect and wait for guidance
 
 ### Automatic Gates
 
-1. **Build → Review.** Automatic — when build completes with `review_ready.yaml`, proceed to review.
-
-2. **Review → Build (rejection loop).** Automatic — when review produces `feedback.yaml`, increment `attempt_counter` in `task_states` and re-enter build phase in Fix Mode. Max 3 attempts.
-
-3. **Review → Merge (approval).** Automatic — when review approves, execute the merge protocol.
-
-4. **Stage Complete → Next Stage.** Automatic — when all tasks in a stage are completed, escalated, or halted, proceed to next stage.
-
-5. **All Stages Complete → Retrospective.** Automatic — retrospective runs without human gate.
-
----
-
-## Loop Control
-
-### Build-Review Loop (per task)
-
-```
-build → review → APPROVED → merge → completed
-               → REJECTED → increment task_states[task_id].attempt_counter
-                           → attempt_counter < max_attempts → build (Fix Mode)
-                           → attempt_counter >= max_attempts → escalated
-               → DESIGN_ISSUE → halt task, write design_issues.yaml
-```
-
-- **attempt_counter** starts at 0 and increments on each rejection. Tracked per-task in `task_states`.
-- **max_attempts** defaults to 3 (configurable in config.yaml).
-- On escalation, mark the task as `escalated`, propagate blocks to dependents, and report to the human with:
-  - The full failure history from all attempts
-  - The pattern of repeated issues
-  - A recommendation: re-plan the task, split it, or get human intervention
-
-### Sprint Stage Loop
-
-After a stage reaches `stage_complete`:
-1. Check if there are remaining stages.
-2. If stages remain, transition to `planning_worktrees` for the next stage.
-3. If all stages are done, transition to `retrospective`.
-4. Report any escalated or blocked tasks in the retrospective.
-
----
-
-## Design Issue Handling
-
-When a build or review sub-agent detects a design-level problem:
-
-1. The sub-agent writes to `design_issues.yaml` in the project root.
-2. The orchestrator detects the new entry.
-3. The affected task is marked `design_issue` in `task_states`.
-4. The task is NOT retried — design issues require architect intervention.
-5. Dependents in later stages are blocked.
-6. The human is notified with the issue details and affected tasks.
-7. Resolution requires running `/wf-command-sa` or `/wf-command-swa` to amend the architecture.
+1. **Build → Review.** When build completes with `review_ready.yaml`, proceed to review.
+2. **Review → Build (rejection).** When review produces `feedback.yaml`, increment `attempt_counter` and re-enter build in Fix Mode. Max 3 attempts, then escalate.
+3. **Review → Merge (approval).** When review approves, execute merge protocol.
+4. **Stage Complete → Next Stage.** When all tasks resolved, proceed to next stage.
+5. **All Stages Complete → Retrospective.** Automatic, no human gate.
+6. **Retrospective → Publishing.** Automatic, no human gate.
 
 ---
 
@@ -333,57 +217,33 @@ When a build or review sub-agent detects a design-level problem:
 
 | Scenario | Action |
 |:---------|:-------|
-| Sub-agent HALTs | Read the halt reason. Present to human. Mark task as `escalated` if in stage execution. Other tasks continue. |
-| State file is missing | Create it with `current_phase: idle`. |
-| State file is corrupted | HALT. Present the corruption to human. Do not guess. |
-| Config file is missing | HALT. Cannot resolve paths without config. |
-| sprint.yaml is missing | HALT. Tell user to run `/wf-command-swa` first. |
-| Sub-agent output is missing | The sub-agent may have failed silently. Report to human. Do not retry automatically. |
-| Git conflicts during merge | Abort merge. Escalate to human with conflicting files. Do not auto-resolve. |
-| Worktree creation fails | HALT for that task. Report to human. Other tasks continue. |
-| Dependency cycle detected | HALT. Report the cycle to the human. Do not attempt to break cycles. |
+| Sub-agent HALTs | Read halt reason. Present to human. Mark task as `escalated`. Other tasks continue. |
+| State file missing | Create with `current_phase: idle`. |
+| State file corrupted | HALT. Present to human. Do not guess. |
+| Config file missing | HALT. Cannot resolve paths without config. |
+| sprint.yaml missing | HALT. Tell user to run `/wf-command-swa`. |
+| Sub-agent output missing | Report to human. Do not retry automatically. |
+| Git conflicts during merge | Abort merge. Escalate to human. Do not auto-resolve. |
+| Worktree creation fails | HALT for that task. Other tasks continue. |
+| Dependency cycle detected | HALT. Report cycle to human. |
 | design_issues.yaml written | Mark task as design_issue. Block dependents. Notify human. |
-
----
-
-## Worktree Cleanup
-
-Worktrees must be cleaned up in these scenarios:
-
-1. **Stage completion (normal):** Remove all worktrees for completed tasks after merge.
-2. **Stage completion (escalated/design_issue tasks):** Remove worktrees during stage cleanup.
-3. **Error recovery:** If the pipeline is interrupted or restarted, check for orphaned worktrees:
-   ```bash
-   git worktree list
-   ```
-   Remove any worktrees under the configured `parallel.worktree_base` that don't correspond to active tasks in `task_states`.
+| Sprint branch creation fails | HALT. Ask human whether to reuse or rename. |
+| PR creation fails | HALT. Report to human (e.g., `gh` not authenticated). |
 
 ---
 
 ## Hard Constraints
 
-- **Thin controller.** The orchestrator never performs analysis, planning, building, or reviewing. It only manages state transitions and context assembly.
-- **Minimal context.** Each sub-agent gets ONLY its SKILL.md + required state files + context_to_load. Never over-provision context.
+- **Thin controller.** Never perform analysis, planning, building, or reviewing. Only manage state transitions and context assembly.
+- **Minimal context.** Each sub-agent gets ONLY its SKILL.md + required state files + context_to_load.
 - **State is persistent.** All state lives in `pipeline_state.yaml`. The orchestrator is stateless between dispatches.
 - **Gates are mandatory.** Human gates cannot be skipped. Automatic gates cannot be overridden.
-- **Max 3 build-review loops per task.** Escalate on the 4th attempt. Do not silently continue.
-- **Design issues halt tasks.** Never retry a task that has written a design issue. It requires architect intervention.
-- **Append-only history.** The history log in `pipeline_state.yaml` is append-only. Never delete or modify history entries.
+- **Max 3 build-review loops per task.** Escalate on the 4th attempt.
+- **Design issues halt tasks.** Never retry a task with a design issue. Requires architect intervention.
+- **Append-only history.** Never delete or modify history entries in `pipeline_state.yaml`.
 - **No auto-conflict resolution.** Merge conflicts always escalate to the human.
-- **Escalation does not block the stage.** Other tasks in the same stage continue. Only dependents in later stages are blocked.
-- **Worktree cleanup is mandatory.** Never leave orphaned worktrees after stage completion or error recovery.
-- **Retrospective is mandatory.** Every completed sprint gets a retrospective. It runs automatically without a human gate.
-
----
-
-## Halt Conditions
-
-Stop and report to the human if:
-- `config.yaml` is missing or cannot be parsed
-- `sprint.yaml` is missing (tell user to run `/wf-command-swa`)
-- `pipeline_state.yaml` is corrupted (invalid YAML, unknown phase)
-- A dependency cycle is detected during stage computation
-- A merge conflict occurs (escalate the specific task, not the whole pipeline)
-- A gate cannot be resolved (human is unresponsive — do not auto-approve)
-- The sprint has no remaining eligible tasks (all done or all blocked)
-- All tasks in all remaining stages are blocked (nothing can proceed)
+- **Escalation does not block the stage.** Other tasks continue. Only dependents in later stages are blocked.
+- **Worktree cleanup is mandatory.** Never leave orphaned worktrees.
+- **Retrospective is mandatory.** Every completed sprint gets a retrospective.
+- **Sprint branch is mandatory.** All work happens on a sprint branch, never directly on main.
+- **Publishing is mandatory.** Every sprint must push and create a PR. Pipeline is not done until the PR URL is reported.

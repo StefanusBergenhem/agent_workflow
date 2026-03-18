@@ -32,7 +32,7 @@ Sub-agent receives:
 - `config.yaml`
 - `<worktree_path>/.workflow/current_task.yaml`
 - `<worktree_path>/.workflow/review_ready.yaml`
-- Git diff (via `git diff origin/main` within the worktree)
+- Git diff (via `git diff origin/<sprint_branch>` within the worktree)
 - Memory file at `paths.memory`
 - Conventions file(s) at `paths.conventions`
 - `COMPONENTS.yaml` (for architecture compliance)

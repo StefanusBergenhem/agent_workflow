@@ -5,10 +5,12 @@
 ```yaml
 # .workflow/pipeline_state.yaml
 current_phase: "idle"
-# Valid: idle | computing_stages | planning_worktrees | awaiting_stage_approval |
-#        executing_stage | stage_complete | retrospective | escalated
+# Valid: idle | creating_sprint_branch | computing_stages | planning_worktrees |
+#        awaiting_stage_approval | executing_stage | stage_complete |
+#        retrospective | publishing | escalated
 
 sprint_id: ""                    # Set from sprint.yaml
+sprint_branch: ""                # Set during creating_sprint_branch (e.g., "sprint/S1")
 
 stages:
   total: 0                       # Total number of stages

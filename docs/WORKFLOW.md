@@ -65,17 +65,19 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
 
 ```
 /wf-command-pipeline reads sprint.yaml
+  → create sprint branch from main (sprint/<sprint-id>)
   → compute stages (dependency sort)
   → for each stage:
-      → create worktrees + branches per task
+      → create worktrees + branches per task (from sprint branch)
       → human approves stage
       → spawn parallel build agents
       → spawn review agent per completed build
-      → merge approved tasks to main
+      → merge approved tasks to sprint branch
       → halt tasks with design issues → write design_issues.yaml
       → escalate tasks with 3 failures
   → after all stages: run retrospective
   → produce retrospective/<sprint-id>.md
+  → push sprint branch + create PR to main
   → idle
 ```
 
@@ -98,16 +100,17 @@ The orchestrator runs **resume detection first**:
 - If no `sprint.yaml` exists → HALTs
 
 After resume detection:
-1. Computes dependency stages (topological sort of sprint tasks)
-2. For each stage: creates worktrees, pauses for your approval, then executes all tasks in parallel
-3. Approved tasks merge to main immediately; rejected tasks retry up to 3 times
-4. Design issues halt the affected task (no retries — requires architect fix)
-5. After all stages: runs retrospective automatically
+1. Creates a sprint branch from main (`sprint/<sprint-id>`)
+2. Computes dependency stages (topological sort of sprint tasks)
+3. For each stage: creates worktrees (from sprint branch), pauses for your approval, then executes all tasks in parallel
+4. Approved tasks merge to the sprint branch immediately; rejected tasks retry up to 3 times
+5. Design issues halt the affected task (no retries — requires architect fix)
+6. After all stages: runs retrospective, then pushes sprint branch and creates a PR to main
 
 ### Within each stage execution (parallel per task)
 
 ```
-build → review → APPROVED → merge to main
+build → review → APPROVED → merge to sprint branch
                → REJECTED → retry build (max 3x, then escalate)
                → DESIGN_ISSUE → halt task, write design_issues.yaml
 ```
@@ -178,7 +181,7 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 
 **Runs automatically** after you approve each stage.
 
-**Output:** Merged code + `retrospective/<sprint-id>.md`.
+**Output:** Sprint branch with merged code, `retrospective/<sprint-id>.md`, and a pull request to main.
 
 ### /wf-command-build — TDD Execution
 
@@ -209,7 +212,7 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 
 **Architecture compliance (new):** Verifies modified files belong to the correct component per `COMPONENTS.yaml`, checks import directions against `dependency_rules`, validates ownership per `ARCHITECTURE.md`.
 
-**On approval:** Pushes the branch, merges to main, cleans up the worktree.
+**On approval:** Pushes the branch, merges to the sprint branch, cleans up the worktree.
 
 **On rejection:** Writes `.workflow/feedback.yaml` with specific failures. Build re-runs in fix mode. Max 3 attempts.
 
@@ -309,16 +312,16 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 ### Pipeline lifecycle
 
 ```
-idle → computing_stages → planning_worktrees → awaiting_stage_approval →
-  executing_stage → stage_complete →
+idle → creating_sprint_branch → computing_stages → planning_worktrees →
+  awaiting_stage_approval → executing_stage → stage_complete →
     [more stages?] → planning_worktrees (next stage)
-    [all done?] → retrospective → idle
+    [all done?] → retrospective → publishing (push + PR) → idle
 ```
 
 ### Per-task lifecycle (within a stage)
 
 ```
-pending → building → reviewing → completed (merge to main)
+pending → building → reviewing → completed (merge to sprint branch)
                                → rejected → building (fix mode)
                                           → attempt_counter >= 3 → escalated
                                → design_issue → halted (needs architect)
@@ -349,17 +352,19 @@ parallel:
 
 2. **Worktree planning** — The orchestrator creates one worktree and branch per task, writes task contracts to each worktree.
 
-3. **Execution** — All tasks build and review in parallel. Approved tasks merge to main immediately.
+3. **Execution** — All tasks build and review in parallel. Approved tasks merge to the sprint branch immediately.
 
 4. **Stage completion** — When all tasks in a stage are completed, escalated, or halted (design issue), worktrees are cleaned up and the next stage begins.
+
+5. **Publishing** — After retrospective, the sprint branch is pushed and a PR is created to main with a sprint summary.
 
 ### Merge protocol
 
 When a task's review is approved:
 1. Push the branch from the worktree
-2. Merge to main with `--no-ff`
+2. Merge to the sprint branch with `--no-ff`
 3. If conflicts occur: abort merge, escalate to human (no auto-resolution)
-4. On success: push main, remove the worktree
+4. On success: push sprint branch, remove the worktree
 
 ### Escalation propagation
 
@@ -495,7 +500,7 @@ git worktree remove <path> --force
 The task is halted — it cannot be retried. Resolve the design issue via `/wf-command-sa` (architecture change) or `/wf-command-swa` (task re-plan), then re-run the pipeline.
 
 ### All tasks in a stage are blocked
-If every task in remaining stages depends on an escalated or design-issue task, the pipeline transitions to `retrospective` then `idle`. Resolve the blocking issue first, then re-run `/wf-command-pipeline`.
+If every task in remaining stages depends on an escalated or design-issue task, the pipeline transitions to `retrospective` → `publishing` → `idle`. Resolve the blocking issue first, then re-run `/wf-command-pipeline`.
 
 ### Want to start fresh on a task
 Delete the task's worktree (`git worktree remove <path>`), clear its entry from `pipeline_state.yaml` task_states, and re-plan.
