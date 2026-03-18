@@ -148,16 +148,19 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 
 ### /wf-command-sa — Solution Architecture
 
-**What it does:** Translates roadmap into technical strategy. Makes system-level decisions (component structure, data flows, dependency rules). Maintains architecture health.
+**What it does:** Interactive architecture session that translates roadmap into technical strategy. The SA thinks out loud — showing reasoning, presenting alternatives with tradeoffs, and using Mermaid diagrams to make architecture visible during the conversation.
 
 **You decide when to run this.** After strategist, or when architecture needs updating.
 
-**What it does:**
-- Architecture health checks (component size, dependency violations, duplication)
-- Technical design decisions for roadmap features
-- Updates `COMPONENTS.yaml` (component registry with constraints and dependency rules)
-- Updates/creates per-module `ARCHITECTURE.md` files
-- Builds `master_backlog.yaml` with sprint groupings
+**How it works (5 phases with interactive checkpoints):**
+
+1. **Ground** — Loads context, orients you on what exists and what the roadmap asks for
+2. **Diagnose** — Runs architecture health checks, shows a component dependency diagram with issues annotated, discusses findings with you before proceeding
+3. **Design** — Walks through features one at a time: shows where each fits in the system (diagram), presents design decisions with alternatives and reasoning, waits for your input before moving to the next feature
+4. **Plan** — Updates architecture artifacts, builds the master backlog, shows a sprint cut visualization (dependency chains color-coded by epic), discusses sprint boundaries with you
+5. **Commit** — Summarizes decisions, writes artifacts on your approval
+
+Diagrams are ephemeral conversation tools — they help you see the system during the session but are not persisted into files. Agents consume the YAML artifacts.
 
 **Output:** `master_backlog.yaml`, updated `COMPONENTS.yaml`, updated `ARCHITECTURE.md` files.
 
