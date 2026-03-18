@@ -47,7 +47,7 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
 | Role | Command | Input | Output |
 |:-----|:--------|:------|:-------|
 | **Product Strategist** | `/wf-command-strategist` | Conversation, `roadmap.yaml` | `roadmap.yaml` |
-| **Solution Architect** | `/wf-command-sa` | `roadmap.yaml`, `COMPONENTS.yaml`, `ARCHITECTURE.md` | `master_backlog.yaml`, `COMPONENTS.yaml`, `ARCHITECTURE.md` |
+| **Solution Architect** | `/wf-command-sa` | `roadmap.yaml` (optional), `master_backlog.yaml`, `COMPONENTS.yaml`, `ARCHITECTURE.md` | `master_backlog.yaml`, `COMPONENTS.yaml`, `ARCHITECTURE.md` |
 | **Software Architect** | `/wf-command-swa` | `master_backlog.yaml`, source code | `sprint.yaml` (with task contracts) |
 | **Developer** | (automated) | `sprint.yaml` task contracts | Code + `review_ready.yaml` |
 | **Reviewer** | (automated) | Code diff, task contract | APPROVED / REJECTED / DESIGN_ISSUE |
@@ -147,16 +147,20 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 
 ### /wf-command-sa — Solution Architecture
 
-**What it does:** Interactive architecture session that translates roadmap into technical strategy. The SA thinks out loud — showing reasoning, presenting alternatives with tradeoffs, and using Mermaid diagrams to make architecture visible during the conversation.
+**What it does:** Interactive architecture session. Supports two modes:
+- **Roadmap mode** (when `roadmap.yaml` exists) — translates roadmap into technical strategy
+- **Ongoing mode** (when only `master_backlog.yaml` exists) — evaluates system health, updates architecture, cuts next sprint from existing backlog
 
-**You decide when to run this.** After strategist, or when architecture needs updating.
+The SA thinks out loud — showing reasoning, presenting alternatives with tradeoffs, and using Mermaid diagrams to make architecture visible during the conversation.
+
+**You decide when to run this.** After strategist (roadmap mode), or whenever architecture needs updating and you want to cut the next sprint (ongoing mode).
 
 **How it works (5 phases with interactive checkpoints):**
 
-1. **Ground** — Loads context, orients you on what exists and what the roadmap asks for
+1. **Ground** — Loads context, orients you on what exists and what needs to happen (roadmap features or backlog state)
 2. **Diagnose** — Runs architecture health checks, shows a component dependency diagram with issues annotated, discusses findings with you before proceeding
-3. **Design** — Walks through features one at a time: shows where each fits in the system (diagram), presents design decisions with alternatives and reasoning, waits for your input before moving to the next feature
-4. **Plan** — Updates architecture artifacts, builds the master backlog, shows a sprint cut visualization (dependency chains color-coded by epic), discusses sprint boundaries with you
+3. **Design** — *Roadmap mode:* walks through features one at a time with diagrams and design decisions. *Ongoing mode:* reviews components touched by the next sprint for architecture drift, stale items, and new technical decisions needed.
+4. **Plan** — Updates architecture artifacts, builds/updates the master backlog, shows a sprint cut visualization, discusses sprint boundaries with you
 5. **Commit** — Summarizes decisions, writes artifacts on your approval
 
 Diagrams are ephemeral conversation tools — they help you see the system during the session but are not persisted into files. Agents consume the YAML artifacts.
@@ -441,6 +445,12 @@ This overrides the global `~/.claude/skills/wf-skill-build/SKILL.md` for this pr
 1. `/wf-command-swa` — detail the next sprint from master backlog
 2. `/wf-command-pipeline` — execute it
 
+### Reassessing architecture mid-project
+
+1. `/wf-command-sa` — runs in ongoing mode (no roadmap needed), evaluates system health, updates architecture, re-cuts the backlog
+2. `/wf-command-swa` — detail the next sprint from the updated backlog
+3. `/wf-command-pipeline` — execute it
+
 ### Handling design issues
 
 When the pipeline surfaces a design issue:
@@ -482,7 +492,7 @@ Run `/wf-command-swa` to produce `sprint.yaml` from the master backlog.
 Run `/wf-command-sa` to create the master backlog from the roadmap.
 
 ### "No roadmap.yaml found"
-Run `/wf-command-strategist` to create a product roadmap.
+Either run `/wf-command-strategist` to create a product roadmap, or if you already have a `master_backlog.yaml`, run `/wf-command-sa` directly — it will operate in ongoing mode without a roadmap.
 
 ### "No config.yaml found"
 Run `/wf-command-init` first to bootstrap the project.
