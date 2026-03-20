@@ -1,0 +1,64 @@
+# .workflow/metrics/sprint-<sprint-id>.yaml
+# Pipeline execution metrics for a single sprint.
+# Written by the orchestrator (wf-skill-observability).
+# Read by the retrospective skill for quantitative analysis.
+# Note: cost estimates use a bytes-to-tokens heuristic (configurable token_ratio)
+#       and are approximate — suitable for trending, not billing.
+
+sprint_id: "{{SPRINT_ID}}"
+started_at: ""                           # ISO 8601 — set at pipeline start
+completed_at: ""                         # ISO 8601 — set before retrospective
+duration_minutes: 0                      # Computed: completed_at - started_at
+
+pipeline_phases:
+  # Timing per pipeline phase. started_at set on entry, completed_at on exit.
+  # creating_sprint_branch: { started_at: "", completed_at: "", duration_seconds: 0 }
+  # computing_stages: { started_at: "", completed_at: "", duration_seconds: 0 }
+  # planning_worktrees: { started_at: "", completed_at: "", duration_seconds: 0 }
+  # executing_stage: { started_at: "", completed_at: "", duration_seconds: 0 }
+  # retrospective: { started_at: "", completed_at: "", duration_seconds: 0 }
+  # publishing: { started_at: "", completed_at: "", duration_seconds: 0 }
+
+stages:
+  total: 0
+  durations:
+    # Per-stage timing. Set during stage boundaries.
+    # 1: { started_at: "", completed_at: "", duration_seconds: 0, tasks_count: 0 }
+    # 2: { started_at: "", completed_at: "", duration_seconds: 0, tasks_count: 0 }
+
+tasks:
+  # Per-task metrics. Populated during dispatch steps 5 and 9.
+  # "S1.1":
+  #   component: "auth"
+  #   risk: "low"
+  #   estimated_complexity: "low"
+  #   attempts: 1
+  #   build_durations: [120]            # Seconds per build attempt
+  #   review_durations: [45]            # Seconds per review attempt
+  #   total_duration_seconds: 165       # Sum of all build + review durations
+  #   outcome: "completed"              # completed | escalated | design_issue | blocked
+  #   rejection_types: []               # e.g., ["test_quality", "scope_violation"]
+  #   actual_files_modified: 2          # From review_ready.yaml
+
+cost_estimate:
+  total_dispatches: 0                    # Total sub-agent spawns
+  estimated_context_tokens:
+    build_avg: 0                         # Running avg input tokens per build dispatch
+    review_avg: 0                        # Running avg input tokens per review dispatch
+    retrospective: 0                     # Input tokens for retrospective dispatch
+  models_used:
+    build: "{{BUILD_MODEL}}"
+    review: "{{REVIEW_MODEL}}"
+    retrospective: "{{RETRO_MODEL}}"
+
+summary:
+  # Computed during metrics finalization (before retrospective).
+  # tasks_planned: 0
+  # tasks_completed: 0
+  # tasks_escalated: 0
+  # tasks_blocked: 0
+  # tasks_design_issue: 0
+  # first_attempt_pass_rate: 0.0         # tasks completed on attempt 1 / tasks_completed
+  # avg_attempts: 0.0                    # Mean attempts across completed tasks
+  # longest_task: { id: "", duration_seconds: 0 }
+  # rejection_type_counts: {}            # Aggregate: { test_quality: 1, scope_violation: 2 }
