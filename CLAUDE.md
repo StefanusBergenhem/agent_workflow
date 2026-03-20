@@ -18,6 +18,8 @@ skills/              # Cognitive modes — each has a SKILL.md
   wf-skill-verification/      # Cross-cutting: evidence-based completion
   wf-skill-receiving-feedback/  # Cross-cutting: processing rejections
   wf-skill-testing-anti-patterns/  # Cross-cutting: test quality rules
+  wf-skill-observability/    # Cross-cutting: pipeline metrics and cost estimation
+  wf-skill-continuous-learning/  # Cross-cutting: lesson extraction, memory management, archival
 
 commands/            # Slash commands (thin wrappers invoking skills)
   wf-command-strategist.md    # Product strategy session
@@ -48,6 +50,9 @@ templates/           # Project bootstrapping templates
   master-backlog.yaml.tmpl     # master_backlog.yaml starter
   design-issues.yaml.tmpl      # design_issues.yaml starter
   sprint.yaml.tmpl             # sprint.yaml starter
+  sprint-metrics.yaml.tmpl     # .workflow/metrics/sprint-<id>.yaml schema
+  trends.yaml.tmpl             # .workflow/metrics/trends.yaml schema
+  memory.yaml.tmpl             # docs/MEMORY.yaml starter (structured lessons)
 
 docs/                # Authoring guides and workflow documentation
   persuasion-principles.md    # Persuasion psychology for skill design
@@ -72,7 +77,7 @@ Manual (you decide when):
 
 Automated (runs autonomously via /wf-command-pipeline):
   compute stages → plan worktrees → approve → execute (build + review) → merge
-  → retrospective → idle
+  → retrospective (+ lesson extraction & archival) → idle
 ```
 
 ## Skill Authoring Guides
@@ -85,14 +90,15 @@ When creating or modifying skills, consult these two docs:
 ## Key Conventions
 
 - **Skills** are SKILL.md files — pure markdown instructions that define a cognitive mode
-- **State files** use YAML (`.workflow/current_task.yaml`, `review_ready.yaml`, `feedback.yaml`, `pipeline_state.yaml`)
+- **State files** use YAML (`.workflow/current_task.yaml`, `review_ready.yaml`, `feedback.yaml`, `pipeline_state.yaml`, `metrics/sprint-<id>.yaml`, `metrics/trends.yaml`)
 - **Architecture files** are committed to git: `COMPONENTS.yaml`, `*/ARCHITECTURE.md`, `master_backlog.yaml`, `sprint.yaml`, `roadmap.yaml`
 - **Hook scripts** must exit 2 to block Claude (not exit 1 — that's non-blocking in Claude Code)
 - **Hook input** arrives as JSON on stdin (not environment variables)
 - **Schema consistency** matters: the build skill's `review_ready.yaml` uses `tdd_evidence.red_phase.ran: true` — hooks parse this exact structure
 - **Commands** have YAML frontmatter with a `description` field, then markdown body
 - **Design issues** are written to `design_issues.yaml` when build/review encounter architectural problems that can't be fixed at the code level
-- **Retrospectives** are generated automatically at pipeline end in `retrospective/<sprint-id>.md`
+- **Retrospectives** are generated automatically at pipeline end in `retrospective/<sprint-id>.md`, then archived to `retrospective/archive/` after lessons are extracted
+- **Memory file** (`docs/MEMORY.yaml`) stores structured lessons extracted from retrospectives — consumed by build, review, and SWA skills
 
 ## Architecture Governance
 

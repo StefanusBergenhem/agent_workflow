@@ -12,7 +12,7 @@ paths:
   roadmap: "roadmap.yaml"
   sprint: "sprint.yaml"
   state: "docs/STATE.md"
-  memory: "docs/MEMORY.md"
+  memory: "docs/MEMORY.yaml"
   architecture_docs:             # Globs — all matching files are read by SA
     - "**/ARCHITECTURE.md"
     - "docs/adrs/*.md"
@@ -41,7 +41,29 @@ parallel:
   merge_strategy: "branch-push"    # or "direct-merge"
   max_concurrent_tasks: 4
 
+models:
+  build: "sonnet"            # Model for build sub-agents (task contracts are tight, Sonnet suffices)
+  review: "sonnet"           # Model for review sub-agents (checklist-driven validation)
+  retrospective: "sonnet"    # Model for retrospective sub-agents
+
 task_sizing:
   max_files_to_touch: 3
   max_context_files: 5
   max_estimated_lines: 150
+
+learning:
+  enabled: true                            # Set false to skip lesson extraction and archival
+  max_memory_entries: 30                   # Max lessons in the memory file
+  archive_retrospectives: true             # Move retrospective .md to retrospective/archive/
+  archive_metrics: true                    # Move sprint metrics to .workflow/archive/metrics/
+  cleanup_design_issues: true              # Remove resolved design issues after extraction
+
+observability:
+  enabled: true                          # Set false to skip metrics collection
+  metrics_dir: ".workflow/metrics"       # Where metrics files are written
+  cost_estimation:
+    enabled: true
+    token_ratio: 4                       # Bytes per token (rough estimate for trending)
+  trends:
+    enabled: true                        # Track cross-sprint trends
+    max_sprints: 20                      # Keep last N sprints in trends.yaml

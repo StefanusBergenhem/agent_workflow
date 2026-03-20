@@ -20,6 +20,7 @@ You are the Software Architect. You take the next sprint cut from the master bac
 | Architecture Docs | `*/ARCHITECTURE.md` files | Per-module constraints and interfaces |
 | Source Code | Component `path` directories | Actual code to understand real interfaces |
 | Config | `.workflow/config.yaml` | Project paths, commands, sizing limits |
+| Memory | `paths.memory` (from config, optional) | Past lessons about contract quality and component rules |
 
 ---
 
@@ -51,6 +52,20 @@ For each backlog item in the sprint:
 5. **Check cross-component impacts.** Does this change affect other components through shared types, interfaces, or imports? If yes:
    - If the impact is within dependency rules: include affected files in `files_to_touch` or note as a separate task
    - If the impact violates dependency rules: flag as a design issue
+
+### Step 2b — Consult Memory
+
+If the memory file exists at `paths.memory` (from config), read it. It contains structured lessons from past sprints. Apply relevant lessons when producing task contracts:
+
+1. **`contract_patterns` lessons** — apply universally. These are rules about contract quality learned from past failures. Example: "Always include CONVENTIONS.md in context_to_load for tasks modifying existing code."
+
+2. **`component_rules` lessons** — apply per-component. Match the lesson's component against the task's component. Example: "Component auth requires auth/types.ts in context_to_load for any task touching auth/."
+
+3. **`rejection_patterns` lessons** — use to tighten acceptance criteria and out_of_scope boundaries. If a pattern was previously rejected for a specific reason, ensure the contract prevents recurrence.
+
+4. **`architecture_signals` lessons** — use to inform risk ratings and implementation notes. If a lesson flags a component as architecturally fragile, consider raising the task's risk level.
+
+If the memory file doesn't exist, proceed without it — do not fail or warn.
 
 ### Step 3 — Produce Task Contracts
 

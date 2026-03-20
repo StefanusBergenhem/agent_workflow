@@ -131,7 +131,7 @@ Execute the approval workflow:
 
 2. **Update state.** If any infrastructure facts, deferred items, or known issues changed, update the state file (`paths.state` from config).
 
-3. **Update memory.** If the work solved a recurring problem or revealed a lesson worth preserving, add a rule to the memory file (`paths.memory` from config). Check the capacity rule — if the memory file has a max entries limit, archive the oldest entry first.
+3. **Update memory (optional).** If the work solved a recurring problem or revealed a lesson worth preserving, add a structured entry to the memory file (`paths.memory` from config). Use the YAML format with `id`, `category`, `rule`, `evidence`, and `confidence` fields. The continuous-learning skill will consolidate and deduplicate at sprint end — partial or rough entries are fine here.
 
 4. **Update architecture docs.** If the work established a new architectural pattern or constraint, add a one-sentence entry to the ADR/architecture doc explaining the decision and its rationale.
 

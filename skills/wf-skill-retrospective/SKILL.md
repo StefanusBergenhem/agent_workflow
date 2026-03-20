@@ -20,6 +20,10 @@ You are the Retrospective Analyst. You run at the end of every sprint pipeline e
 | Design Issues | `design_issues.yaml` (project root, optional) | Issues surfaced during execution |
 | Config | `.workflow/config.yaml` | Project settings |
 | Git Log | `git log` for the sprint | What was actually committed |
+| Sprint Metrics | `.workflow/metrics/sprint-<sprint-id>.yaml` (optional) | Timing, cost, and per-task quantitative data |
+| Trends | `.workflow/metrics/trends.yaml` (optional) | Cross-sprint comparison data |
+| Memory File | `paths.memory` (from config) | Current lessons — needed by continuous learning protocol |
+| Learning Skill | `skills/wf-skill-continuous-learning/SKILL.md` | Lesson extraction and archival protocol |
 
 ---
 
@@ -46,6 +50,19 @@ You are the Retrospective Analyst. You run at the end of every sprint pipeline e
    ```
 
 5. Look for any `feedback.yaml` files in worktree locations or `.workflow/` — these contain rejection details.
+
+### Step 1b — Load Metrics (if available)
+
+If `.workflow/metrics/sprint-<sprint-id>.yaml` exists, load it for quantitative analysis:
+- Phase durations, stage durations, per-task timing
+- Cost estimates (total dispatches, estimated context tokens, models used)
+- Pre-computed summary (first_attempt_pass_rate, avg_attempts, rejection_type_counts)
+
+If `.workflow/metrics/trends.yaml` exists, load it for cross-sprint comparison:
+- Prior sprint pass rates, attempt averages, component health scores
+- Use this to identify improving or declining trends
+
+If these files don't exist (observability disabled or pre-observability sprint), proceed with qualitative analysis only — do not fail or warn.
 
 ### Step 2 — Analyse Patterns
 
@@ -74,6 +91,16 @@ You are the Retrospective Analyst. You run at the end of every sprint pipeline e
 - How many tasks were planned vs completed?
 - Was the sprint goal achieved?
 - Which components had the most issues?
+
+#### Quantitative Analysis (if metrics available)
+
+If sprint metrics were loaded in Step 1b, include these analyses:
+
+- **Phase durations:** Which pipeline phase took the longest? Is stage execution dominated by build or review time?
+- **Cost estimate:** Total dispatches, estimated context tokens by phase, models used. Flag if costs seem disproportionate to task count.
+- **Component health:** Pass rate and avg attempts per component. Flag components with pass rate below 70% or avg attempts above 2.0.
+- **Trends (if trends.yaml loaded):** Compare first_attempt_pass_rate, avg_attempts, and component health to prior sprints. Flag declining components (pass rate dropped >15% vs previous sprint). Note improving metrics.
+- **Estimation accuracy:** Compare estimated_complexity and risk from sprint.yaml against actual attempts and duration. Are "low risk" tasks actually passing first attempt?
 
 ### Step 3 — Generate Improvement Suggestions
 
@@ -124,6 +151,37 @@ Write the report to `retrospective/<sprint-id>.md`:
   - Impact: Task S1.3 blocked
   - Status: open — needs SA resolution
 
+## Quantitative Metrics
+<!-- Include this section only if sprint metrics were loaded in Step 1b. Omit entirely if no metrics available. -->
+
+### Timing
+- Sprint duration: X minutes
+- Longest phase: <phase> (X seconds)
+- Longest stage: Stage N (X seconds, N tasks)
+- Longest task: S1.X (X seconds, N attempts)
+- Avg task duration: X seconds
+
+### Efficiency
+- First-attempt pass rate: X% (N/M)
+- Avg attempts per task: X.X
+- Total dispatches: N (N build, N review)
+- Rejection breakdown: type1 (N), type2 (N)
+
+### Cost Estimate
+- Estimated input tokens: ~XK (build avg: XK, review avg: XK, retro: XK)
+- Models: build=X, review=X, retro=X
+
+### Trends (vs prior sprints)
+<!-- Only if trends.yaml was loaded. Show direction arrows or "stable". -->
+- First-attempt pass rate: X% (was X% — improving/declining/stable)
+- Avg attempts: X.X (was X.X — improving/declining/stable)
+- Declining components: <list or "none">
+
+### Component Health
+| Component | Tasks | Pass Rate | Avg Attempts | Trend |
+|:----------|:------|:----------|:-------------|:------|
+| example   | N     | X%        | X.X          | stable |
+
 ## Suggested Improvements
 
 ### Workflow
@@ -143,6 +201,18 @@ Write the report to `retrospective/<sprint-id>.md`:
 
 If `retrospective/` directory doesn't exist, create it.
 
+### Step 6 — Apply Continuous Learning Protocol
+
+After writing the retrospective report, load `skills/wf-skill-continuous-learning/SKILL.md` and execute it. This protocol:
+
+1. Extracts actionable lessons from the retrospective report you just wrote
+2. Deduplicates against the existing memory file
+3. Enforces memory capacity limits (archives lowest-priority lessons if exceeded)
+4. Archives the retrospective report and sprint metrics to archive directories
+5. Cleans resolved design issues from `design_issues.yaml`
+
+The memory file at `paths.memory` is the durable output — it carries refined lessons forward to future sprints where build, review, and SWA skills consume them.
+
 ---
 
 ## Output
@@ -150,6 +220,7 @@ If `retrospective/` directory doesn't exist, create it.
 | Artifact | Location | Description |
 |:---------|:---------|:------------|
 | Retrospective Report | `retrospective/<sprint-id>.md` | Structured analysis of sprint execution |
+| Updated Memory File | `paths.memory` (from config) | Refined lessons extracted from this sprint (via continuous learning protocol) |
 
 ---
 
@@ -158,7 +229,7 @@ If `retrospective/` directory doesn't exist, create it.
 - **Blameless.** Failures are systemic signals, not individual faults. Never frame issues as "the developer did X wrong."
 - **Evidence-based.** Every claim must reference specific data (task IDs, rejection types, attempt counts). No speculation.
 - **Actionable suggestions.** Every improvement must be specific enough to act on. "Improve test quality" is not actionable. "Include conventions file in context_to_load for all tasks" is.
-- **Read-only.** This skill never modifies sprint files, pipeline state, architecture docs, or any workflow artifact. It only reads and reports.
+- **Read-only (except memory and archives).** This skill never modifies sprint files, pipeline state, or architecture docs. It writes to the memory file (via continuous learning protocol) and moves processed documents to archive directories.
 - **Automatic.** This skill is invoked by the orchestrator at pipeline end. No human gate required.
 
 ---

@@ -79,11 +79,15 @@ Key fields: `current_phase`, `sprint_branch`, `stages.definitions`, `task_states
 3. If no sprint file exists → HALT. Tell the user to run `/wf-command-swa` to produce `sprint.yaml`.
 4. If all tasks are complete → transition to `retrospective` (sprint done, retrospective pending).
 
+**Metrics initialization:** If `config.observability.enabled` is true (default), create `.workflow/metrics/` directory if needed and initialize `.workflow/metrics/sprint-<sprint-id>.yaml` with sprint metadata and model config. If resuming mid-sprint and the metrics file already exists, do not overwrite. See `skills/wf-skill-observability/SKILL.md` for the initialization schema.
+
 ### Dispatch Protocol
 
 See [DISPATCH.md](DISPATCH.md) for the full dispatch protocol, context envelopes, and per-phase file lists.
 
 **Key principle:** Sub-agents get the minimum context needed. They do not get other skills' definitions, pipeline state details, or files outside their scope. Announce every state transition before dispatching.
+
+**Model selection:** Read `models.<phase>` from `config.yaml` to determine the model for each sub-agent (build, review, retrospective). Pass this as the `model` parameter on the Agent tool call. If the key is missing, omit the parameter (inherits the parent's model). The orchestrator itself runs on opus; sub-agents use lighter models because task contracts constrain their work.
 
 ---
 
@@ -171,7 +175,8 @@ When a stage reaches `stage_complete`:
 1. **Clean up worktrees** — see [GIT_OPERATIONS.md](GIT_OPERATIONS.md).
 2. **Update the stage status** in `pipeline_state.yaml` to `completed`.
 3. **Write stage summary** — follow the Context Hygiene Protocol (see below). Write compact `stage_summaries` entry to `pipeline_state.yaml`.
-4. **Check for next stage:**
+4. **Record stage metrics:** If `config.observability.enabled`, record `completed_at` and compute `duration_seconds` for this stage in `.workflow/metrics/sprint-<sprint-id>.yaml → stages.durations.<N>`.
+5. **Check for next stage:**
    - If `stages.current < stages.total`: increment `stages.current`, transition to `planning_worktrees`.
    - If all stages complete: transition to `retrospective`.
 
@@ -216,10 +221,12 @@ After `stage_complete`, before proceeding to `planning_worktrees` for the next s
 
 When all stages are complete (or all remaining tasks are blocked/escalated):
 
-1. Transition to `retrospective`.
-2. Spawn the retrospective sub-agent with its context envelope.
-3. The retrospective skill produces `retrospective/<sprint-id>.md`.
-4. On completion, transition to `publishing`. See [GIT_OPERATIONS.md](GIT_OPERATIONS.md) for the publishing protocol.
+1. **Finalize metrics:** If `config.observability.enabled`, compute summary aggregates in `.workflow/metrics/sprint-<sprint-id>.yaml` — tasks_planned, tasks_completed, first_attempt_pass_rate, avg_attempts, longest_task, rejection_type_counts. Set `completed_at` and compute `duration_minutes`. See `skills/wf-skill-observability/SKILL.md § Metrics Finalization` for the full computation.
+2. Transition to `retrospective`.
+3. Spawn the retrospective sub-agent with its context envelope (includes metrics files — see [DISPATCH.md](DISPATCH.md)).
+4. The retrospective skill produces `retrospective/<sprint-id>.md`.
+5. **Append trends:** If `config.observability.enabled`, append a summary entry to `.workflow/metrics/trends.yaml`. Trim to `config.observability.trends.max_sprints` entries if exceeded. See `skills/wf-skill-observability/SKILL.md § Trends Append` for the schema.
+6. On completion, transition to `publishing`. See [GIT_OPERATIONS.md](GIT_OPERATIONS.md) for the publishing protocol.
 
 ---
 

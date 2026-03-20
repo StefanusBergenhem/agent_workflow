@@ -76,6 +76,8 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
       → escalate tasks with 3 failures
   → after all stages: run retrospective
   → produce retrospective/<sprint-id>.md
+  → extract lessons into docs/MEMORY.yaml (continuous learning)
+  → archive retrospective + metrics to archive directories
   → push sprint branch + create PR to main
   → idle
 ```
@@ -303,6 +305,10 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 | `current_task.yaml` | Orchestrator (per worktree) | Build, Review | The task contract — scope, tests, criteria |
 | `review_ready.yaml` | Build (per worktree) | Review | Build completion claim with TDD evidence |
 | `feedback.yaml` | Review (per worktree) | Build (fix mode) | Rejection details with required fixes |
+| `metrics/sprint-<id>.yaml` | Orchestrator | Retrospective | Per-sprint timing, costs, task metrics |
+| `metrics/trends.yaml` | Orchestrator | Retrospective | Cross-sprint trend data (append-only) |
+| `archive/lessons-archived.yaml` | Retrospective (learning) | Human (reference) | Pruned lessons from memory file |
+| `archive/metrics/sprint-<id>.yaml` | Retrospective (learning) | Human (reference) | Archived sprint metrics |
 
 ### Architecture files (project root, committed to git)
 
@@ -314,6 +320,7 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 | `master_backlog.yaml` | `/wf-command-sa` | SwA | Ordered backlog with sprint groupings |
 | `sprint.yaml` | `/wf-command-swa` | Pipeline | Sprint with full inline task contracts |
 | `design_issues.yaml` | Build, Review, SwA | Human, SA, SwA | Design-level problems requiring architect resolution |
+| `docs/MEMORY.yaml` | Retrospective (learning), Review | Build, Review, SwA | Structured lessons from past sprints |
 
 ### Pipeline lifecycle
 
@@ -321,7 +328,7 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 idle → creating_sprint_branch → computing_stages → planning_worktrees →
   executing_stage → stage_complete →
     [more stages?] → planning_worktrees (next stage)
-    [all done?] → retrospective → publishing (push + PR) → idle
+    [all done?] → retrospective (+ learning) → publishing (push + PR) → idle
 ```
 
 ### Per-task lifecycle (within a stage)
@@ -334,6 +341,23 @@ pending → building → reviewing → completed (merge to sprint branch)
 ```
 
 Escalated and design-issue tasks propagate blocks to their dependents in later stages.
+
+---
+
+## Model Selection
+
+Sub-agents use lighter models than the orchestrator since task contracts tightly constrain their work. Configure in `.workflow/config.yaml`:
+
+```yaml
+models:
+  build: "sonnet"            # Model for build sub-agents
+  review: "sonnet"           # Model for review sub-agents
+  retrospective: "sonnet"    # Model for retrospective sub-agents
+```
+
+The orchestrator (and the manual roles — SA, SWA, Strategist) run on opus, which is better suited for architectural reasoning and judgment calls. Build and review sub-agents default to sonnet because the task contracts specify exactly what to do, making the work more about execution than reasoning.
+
+If a `models.<phase>` key is missing, the sub-agent inherits the parent's model.
 
 ---
 
@@ -386,6 +410,61 @@ When a task is escalated (3 failed attempts) or halted (design issue):
 
 ---
 
+## Observability & Metrics
+
+The pipeline collects structured metrics during execution when `config.observability.enabled` is `true` (default). Metrics are best-effort — they never block the pipeline.
+
+### Metrics files
+
+All metrics live in `.workflow/metrics/` (gitignored):
+
+| File | Written by | Purpose |
+|:-----|:-----------|:--------|
+| `sprint-<sprint-id>.yaml` | Orchestrator | Per-sprint timing, per-task attempts/durations, cost estimates |
+| `trends.yaml` | Orchestrator | Cross-sprint summary (append-only, capped at `max_sprints`) |
+
+### What's captured
+
+- **Phase timing** — started_at/completed_at/duration_seconds for each pipeline phase
+- **Stage timing** — duration and task count per dependency stage
+- **Per-task metrics** — build/review durations per attempt, rejection types, outcome, actual files modified
+- **Cost estimation** — estimated context tokens per phase (heuristic: file bytes / `token_ratio`), models used, total dispatch count
+- **Summary aggregates** — first_attempt_pass_rate, avg_attempts, longest_task, rejection_type_counts
+- **Component health** — pass rate and avg attempts per component (in trends.yaml)
+
+### How it works
+
+The orchestrator records metrics at natural state transition points:
+1. **Pipeline start** — initializes the metrics file with sprint metadata
+2. **Each dispatch** (steps 3, 5, 9 of the dispatch protocol) — records context size, dispatch timestamp, and completion data
+3. **Stage boundaries** — records stage durations
+4. **Before retrospective** — finalizes summary aggregates
+5. **Publishing phase** — appends a summary entry to trends.yaml
+
+### Cost estimation
+
+Token counts are estimated, not measured (sub-agents don't report token usage). The heuristic divides context envelope file sizes by `token_ratio` (default: 4 bytes/token). This is approximate but sufficient for identifying trends — if sprint N costs 2x sprint N-1, that's a signal regardless of absolute accuracy.
+
+### Configuration
+
+```yaml
+observability:
+  enabled: true                    # Set false to skip all metrics
+  metrics_dir: ".workflow/metrics"
+  cost_estimation:
+    enabled: true
+    token_ratio: 4                 # Bytes per token estimate
+  trends:
+    enabled: true
+    max_sprints: 20                # Keep last N sprints in trends.yaml
+```
+
+### Backward compatibility
+
+All metrics consumers (retrospective, status) handle the case where metrics files don't exist. Sprints run before observability was added, or with `enabled: false`, produce qualitative-only retrospectives.
+
+---
+
 ## Retrospective
 
 At the end of every sprint pipeline run, a retrospective is automatically generated:
@@ -399,9 +478,72 @@ The retrospective includes:
 - **What worked:** Tasks that passed first attempt and why
 - **What failed:** Rejection patterns, root causes, categorized by failure type
 - **Design issues surfaced:** From `design_issues.yaml`
+- **Quantitative metrics** (if observability enabled): Phase/stage/task timing, cost estimates, component health table, cross-sprint trend comparisons
 - **Suggested improvements:** Specific, actionable changes to workflow, architecture, task sizing, or contract quality
 
 The retrospective runs without a human gate. Review it after each sprint to improve the next one.
+
+---
+
+## Continuous Learning
+
+After each retrospective, the **continuous learning protocol** automatically closes the feedback loop:
+
+### How it works
+
+1. **Extract** — Parses the retrospective report's "What Failed" and "Suggested Improvements" sections, plus sprint metrics (component health, rejection patterns), and distils them into structured lessons
+2. **Deduplicate** — Checks each lesson against the existing memory file. If a pattern already exists, it reinforces confidence and adds evidence instead of duplicating
+3. **Enforce capacity** — Memory file is capped at `max_memory_entries` (default 30). Lowest-priority lessons are archived to `.workflow/archive/lessons-archived.yaml`
+4. **Archive** — Moves the retrospective report to `retrospective/archive/` and sprint metrics to `.workflow/archive/metrics/`, so they don't consume context in future runs
+5. **Clean design issues** — Removes resolved entries from `design_issues.yaml`
+
+### Memory file format
+
+Lessons are stored in `docs/MEMORY.yaml` (or wherever `paths.memory` points):
+
+```yaml
+version: 1
+max_entries: 30
+
+lessons:
+  - id: "L-001"
+    category: "contract_patterns"     # contract_patterns | component_rules | rejection_patterns | process_rules | architecture_signals
+    rule: "Always include CONVENTIONS.md in context_to_load for tasks modifying existing code"
+    evidence:
+      - sprint: "S1"
+        tasks: ["S1.3", "S1.5"]
+        detail: "Both rejected for convention violations"
+    confidence: "high"                # high | medium
+    created: "2026-03-15"
+    last_reinforced: "2026-03-20"
+```
+
+### Who consumes lessons
+
+| Consumer | Categories used | How |
+|:---------|:---------------|:----|
+| **SWA** | `contract_patterns`, `component_rules`, `architecture_signals` | Applies lessons when creating task contracts — adds context files, adjusts risk levels, tightens acceptance criteria |
+| **Build** | `component_rules`, `rejection_patterns` | Reads lessons for component-specific guidance during implementation |
+| **Review** | `rejection_patterns` | Scans for known failure patterns before reviewing |
+
+### Archive locations
+
+| Source | Archive | Preserved in git? |
+|:-------|:--------|:------------------|
+| `retrospective/<id>.md` | `retrospective/archive/<id>.md` | Yes |
+| `.workflow/metrics/sprint-<id>.yaml` | `.workflow/archive/metrics/sprint-<id>.yaml` | No (gitignored) |
+| Pruned lessons | `.workflow/archive/lessons-archived.yaml` | No (gitignored) |
+
+### Configuration
+
+```yaml
+learning:
+  enabled: true                    # Set false to skip learning
+  max_memory_entries: 30           # Cap on active lessons
+  archive_retrospectives: true     # Move reports to archive/
+  archive_metrics: true            # Move metrics to archive/
+  cleanup_design_issues: true      # Remove resolved issues
+```
 
 ---
 
