@@ -115,6 +115,14 @@ When creating or modifying skills, consult these two docs:
 - **Skills**: Dry-run on a real project via `/wf-command-init` then `/wf-command-pipeline`. Verify sub-agents receive only their mandated context.
 - **Install script**: Run `./install.sh` — it's idempotent (safe to re-run).
 
+## Consistency Checks
+
+When adding or modifying skills, commands, hooks, templates, or config fields, **always verify**:
+
+- **`install.sh`** — Does it handle the new/changed artifact? Skills and commands are glob-based (auto-discovered), but hooks must be listed in `hooks/hooks.json` and the summary output should reflect any new artifact categories.
+- **`commands/wf-command-init.md`** — Does the init command's example config, directory scaffolding, and `.gitignore` entries reflect the change? New config sections need to appear in the example block. New directories the pipeline expects must be created during init. New generated output directories should be gitignored.
+- **`templates/workflow-config.yaml.tmpl`** — Is the canonical config template in sync with what init documents?
+
 ## Collaboration Posture
 
 When reviewing or extending the plan, your posture depends on what is needed:

@@ -2,13 +2,18 @@
 set -euo pipefail
 
 # Claude Code Workflow — Installation Script
-# Installs skills, commands, hooks, and global rules into ~/.claude/
+# Copies skills, commands, hooks, and global rules into ~/.claude/
 # Safe to run multiple times (idempotent).
+#
+# All artifacts are copied (not symlinked) so ~/.claude/ is fully
+# self-contained — no runtime dependency on this repo. This matters
+# for Docker containers that mount ~/.claude/ but not this repo.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 SKILLS_DIR="$CLAUDE_DIR/skills"
 COMMANDS_DIR="$CLAUDE_DIR/commands"
+HOOKS_DIR="$CLAUDE_DIR/hooks"
 GLOBAL_CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
 MARKER="# --- Claude Code Workflow (managed block) ---"
 
@@ -21,49 +26,51 @@ echo ""
 echo "[1/6] Creating directories..."
 mkdir -p "$SKILLS_DIR"
 mkdir -p "$COMMANDS_DIR"
+mkdir -p "$HOOKS_DIR"
 echo "  Created: $SKILLS_DIR"
 echo "  Created: $COMMANDS_DIR"
+echo "  Created: $HOOKS_DIR"
 
 # -------------------------------------------------------
-# 2. Symlink skills
+# 2. Copy skills
 # -------------------------------------------------------
 echo ""
-echo "[2/6] Linking skills..."
+echo "[2/6] Copying skills..."
 
-# Remove stale symlinks for old skill names
+# Remove stale entries for old skill names
 for stale_skill in analyse plan build review orchestrate scope-guard root-cause-tracing verification receiving-feedback testing-anti-patterns; do
     stale_target="$SKILLS_DIR/$stale_skill"
-    if [ -L "$stale_target" ]; then
-        rm "$stale_target"
-        echo "  Removed stale symlink: $stale_skill"
+    if [ -L "$stale_target" ] || [ -d "$stale_target" ]; then
+        rm -rf "$stale_target"
+        echo "  Removed stale: $stale_skill"
     fi
 done
 
 for skill_dir in "$SCRIPT_DIR"/skills/*/; do
     skill_name="$(basename "$skill_dir")"
     target="$SKILLS_DIR/$skill_name"
+    # Remove previous version (symlink or directory)
     if [ -L "$target" ]; then
         rm "$target"
     elif [ -d "$target" ]; then
-        echo "  WARNING: $target exists as a real directory, skipping (remove manually to link)"
-        continue
+        rm -rf "$target"
     fi
-    ln -s "$skill_dir" "$target"
-    echo "  Linked: $skill_name -> $skill_dir"
+    cp -r "$skill_dir" "$target"
+    echo "  Copied: $skill_name"
 done
 
 # -------------------------------------------------------
-# 3. Symlink commands
+# 3. Copy commands
 # -------------------------------------------------------
 echo ""
-echo "[3/6] Linking commands..."
+echo "[3/6] Copying commands..."
 
-# Remove stale symlinks for old command filenames
+# Remove stale entries for old command filenames
 for stale_cmd in analyse.md plan.md build.md review.md init.md status.md pipeline.md; do
     stale_target="$COMMANDS_DIR/$stale_cmd"
-    if [ -L "$stale_target" ]; then
-        rm "$stale_target"
-        echo "  Removed stale symlink: $stale_cmd"
+    if [ -L "$stale_target" ] || [ -f "$stale_target" ]; then
+        rm -f "$stale_target"
+        echo "  Removed stale: $stale_cmd"
     fi
 done
 
@@ -75,14 +82,12 @@ for cmd_file in "$SCRIPT_DIR"/commands/*.md; do
         continue
     fi
     target="$COMMANDS_DIR/$cmd_name"
+    # Remove previous version (symlink or file)
     if [ -L "$target" ]; then
         rm "$target"
-    elif [ -f "$target" ]; then
-        echo "  WARNING: $target exists as a real file, skipping (remove manually to link)"
-        continue
     fi
-    ln -s "$cmd_file" "$target"
-    echo "  Linked: $cmd_name -> $cmd_file"
+    cp "$cmd_file" "$target"
+    echo "  Copied: $cmd_name"
 done
 
 # -------------------------------------------------------
@@ -136,44 +141,20 @@ else
 fi
 
 # -------------------------------------------------------
-# 5. Install hooks into ~/.claude/settings.json
+# 5. Copy hooks and install into settings.json
 # -------------------------------------------------------
 echo ""
 echo "[5/6] Installing hooks..."
 HOOKS_SOURCE="$SCRIPT_DIR/hooks/hooks.json"
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
-if [ -f "$HOOKS_SOURCE" ]; then
-    if [ -f "$SETTINGS_FILE" ]; then
-        # Check if hooks already exist in settings.json
-        if grep -q '"hooks"' "$SETTINGS_FILE" 2>/dev/null; then
-            echo "  WARNING: $SETTINGS_FILE already contains hooks configuration."
-            echo "  Source:  $HOOKS_SOURCE"
-            echo "  Review and merge manually if needed."
-            echo "  (Skipping to avoid overwriting custom hooks)"
-        else
-            echo "  WARNING: $SETTINGS_FILE exists but has no hooks."
-            echo "  You need to manually merge hooks from: $HOOKS_SOURCE"
-            echo "  into: $SETTINGS_FILE"
-        fi
-    else
-        # No settings.json — create with hooks content
-        cp "$HOOKS_SOURCE" "$SETTINGS_FILE"
-        echo "  Created: $SETTINGS_FILE"
-    fi
-else
-    echo "  No hooks.json found in $SCRIPT_DIR/hooks/, skipping."
-fi
 
-# -------------------------------------------------------
-# 6. Make hook scripts executable
-# -------------------------------------------------------
-echo ""
-echo "[6/6] Setting permissions..."
+# Copy hook scripts to ~/.claude/hooks/
 hook_scripts_found=0
 for hook_script in "$SCRIPT_DIR"/hooks/*.sh "$SCRIPT_DIR"/hooks/*.bash "$SCRIPT_DIR"/hooks/*.py; do
     if [ -f "$hook_script" ]; then
-        chmod +x "$hook_script"
-        echo "  Made executable: $(basename "$hook_script")"
+        cp "$hook_script" "$HOOKS_DIR/"
+        chmod +x "$HOOKS_DIR/$(basename "$hook_script")"
+        echo "  Copied: $(basename "$hook_script") -> $HOOKS_DIR/"
         hook_scripts_found=1
     fi
 done
@@ -181,11 +162,44 @@ if [ "$hook_scripts_found" -eq 0 ]; then
     echo "  No hook scripts found."
 fi
 
+# Install hook config into settings.json with absolute paths to ~/.claude/hooks/
+if [ -f "$HOOKS_SOURCE" ]; then
+    # Rewrite relative paths to absolute ~/.claude/hooks/ paths
+    HOOKS_JSON=$(sed "s|hooks/|$HOOKS_DIR/|g" "$HOOKS_SOURCE")
+
+    if [ -f "$SETTINGS_FILE" ]; then
+        # Merge hooks into existing settings.json
+        if command -v python3 &>/dev/null; then
+            python3 -c "
+import json
+settings = json.load(open('$SETTINGS_FILE'))
+hooks = json.loads('''$HOOKS_JSON''')
+settings['hooks'] = hooks['hooks']
+json.dump(settings, open('$SETTINGS_FILE', 'w'), indent=2)
+print('  Merged hooks into: $SETTINGS_FILE')
+"
+        else
+            echo "  WARNING: python3 not found. Cannot merge hooks automatically."
+            echo "  Manually merge hooks from: $HOOKS_SOURCE"
+            echo "  into: $SETTINGS_FILE"
+            echo "  NOTE: Use absolute paths (prefix with $HOOKS_DIR/)"
+        fi
+    else
+        # No settings.json — create with hooks content (absolute paths)
+        echo "$HOOKS_JSON" > "$SETTINGS_FILE"
+        echo "  Created: $SETTINGS_FILE"
+    fi
+else
+    echo "  No hooks.json found, skipping config."
+fi
+
 # -------------------------------------------------------
-# Done
+# 6. Summary
 # -------------------------------------------------------
 echo ""
 echo "=== Installation Complete ==="
+echo ""
+echo "All artifacts copied to ~/.claude/ (no symlinks, fully self-contained)."
 echo ""
 echo "Next steps:"
 echo "  1. Review ~/.claude/CLAUDE.md to confirm global rules"
@@ -199,5 +213,7 @@ echo ""
 echo "Installed components:"
 echo "  Skills:   $SKILLS_DIR/"
 echo "  Commands: $COMMANDS_DIR/"
+echo "  Hooks:    $HOOKS_DIR/"
 echo "  Rules:    $GLOBAL_CLAUDE_MD"
-echo "  Hooks:    $SETTINGS_FILE"
+echo "  Config:   $SETTINGS_FILE"
+echo "  Templates: $SCRIPT_DIR/templates/ (reference only, not copied)"

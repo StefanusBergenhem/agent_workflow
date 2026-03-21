@@ -66,8 +66,8 @@ Execute the checklist in priority order. Stop at the first P0 failure — do not
 
 | # | Check | What to verify | Fail Action |
 |:--|:------|:---------------|:------------|
-| 1.1 | **Test existence** | Every case from `testing_mandate` in the contract has a corresponding test in the diff | REJECT with `test_missing` |
-| 1.2 | **Test quality** | Every test has meaningful assertions (not just "no error"). Each test would fail if the implementation were deleted or the logic inverted. No tautological assertions. | REJECT with `test_quality` |
+| 1.1 | **Test existence** | Every case from `testing_mandate` in the contract has a corresponding test in the diff. Error paths, boundary conditions, and edge cases are covered — not just the happy path (#8). | REJECT with `test_missing` |
+| 1.2 | **Test quality** | Check every test against the anti-pattern list: (a) Asserts behavior, not implementation — refactoring without changing behavior must not break the test (#1). (b) Mocks only external boundaries, not owned code — uses real or in-memory fakes for internal dependencies (#2). (c) Assertions are specific enough to fail if the implementation were deleted or returned a trivial value (#3). (d) No direct access to private/internal methods (#4). (e) No snapshot overuse — targeted assertions unless testing a stable serialization format (#5). (f) Test names describe scenario and expected result — failure message alone tells you what broke (#6). (g) No shared mutable state between tests — each test creates its own state (#7). (h) Input variations use parameterized tests, not copy-pasted blocks (#9). | REJECT with `test_quality` |
 | 1.3 | **TDD evidence** | `tdd_evidence` in `review_ready.yaml` shows a red phase with real failure messages that correspond to the test cases. If the red phase is missing, vague, or fake, reject. | REJECT with `tdd_missing` |
 | 1.4 | **Suppression scan** | Scan the diff for suppression directives: `@ts-ignore`, `// nolint`, `# type: ignore`, `eslint-disable`, `noqa`, `@SuppressWarnings`, or any equivalent. | REJECT with `convention_violation` |
 

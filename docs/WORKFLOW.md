@@ -36,6 +36,12 @@ For existing codebases, use deep mode:
 ```
 This additionally generates `COMPONENTS.yaml` with discovered modules, per-module `ARCHITECTURE.md` files, and an `architecture_audit.md` report.
 
+For repos already using the workflow that need updating after a toolkit change:
+```
+/wf-command-init migrate
+```
+This non-destructively scans existing structure, reports what's outdated, and applies targeted upgrades (config sections, directory structure, file format conversions).
+
 Review and customize `.workflow/config.yaml` — especially the `commands` and `paths` sections.
 
 ---
@@ -80,6 +86,117 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
   → archive retrospective + metrics to archive directories
   → push sprint branch + create PR to main
   → idle
+```
+
+---
+
+## Flow Diagram
+
+Complete workflow from product strategy through sprint delivery:
+
+```mermaid
+flowchart TD
+    %% ── Manual Phases ──────────────────────────────────
+    subgraph manual ["Manual Phases (human-paced, approval-gated)"]
+        direction TB
+        STRAT["/wf-command-strategist\n<i>Product Strategist</i>"]
+        STRAT -->|"roadmap.yaml"| SA
+
+        SA["/wf-command-sa\n<i>Solution Architect</i>\n\n5 phases: Ground → Diagnose →\nDesign → Plan → Commit"]
+        SA -->|"master_backlog.yaml\nCOMPONENTS.yaml\nARCHITECTURE.md"| SWA
+
+        SWA["/wf-command-swa\n<i>Software Architect</i>\n\nReads source code, consults\ndocs/MEMORY.yaml, sizes tasks"]
+        SWA -->|"sprint.yaml\n(with task contracts)"| PIPELINE
+    end
+
+    %% ── Automated Pipeline ─────────────────────────────
+    PIPELINE["/wf-command-pipeline\n<i>Orchestrator — state machine</i>"]
+
+    PIPELINE --> BRANCH["Create sprint branch\n<code>sprint/&lt;sprint-id&gt;</code>"]
+    BRANCH --> TOPO["Compute stages\n(topological sort of depends_on)"]
+    TOPO --> PLAN_WT["Plan worktrees\n(one worktree + branch per task)"]
+
+    %% ── Stage Execution ────────────────────────────────
+    subgraph stage ["Stage Execution (parallel per task)"]
+        direction TB
+        BUILD["Build\n<i>wf-skill-build</i>\n\nRed → Green → Refactor\nPreflight → Stage files"]
+
+        BUILD --> REVIEW["Review\n<i>wf-skill-review</i>\n\nP0: Security, Scope, Criteria,\n    Architecture compliance\nP1: Test quality, TDD evidence\nP2: Docs, conventions, clean code\nP3: Independent preflight"]
+
+        REVIEW -->|"APPROVED"| MERGE["Commit + Push branch\nMerge --no-ff to sprint branch"]
+        REVIEW -->|"REJECTED\n(feedback.yaml)"| RETRY{"Attempt\n< 3?"}
+        REVIEW -->|"DESIGN_ISSUE\n(design_issues.yaml)"| HALT_DI["Halt task\nBlock dependents"]
+
+        RETRY -->|"Yes"| BUILD
+        RETRY -->|"No — escalate"| HALT_ESC["Halt task\nBlock dependents\nEscalate to human"]
+
+        MERGE --> CONFLICT{"Merge\nconflict?"}
+        CONFLICT -->|"No"| DONE["Task completed ✓"]
+        CONFLICT -->|"Yes"| HALT_MC["Abort merge\nEscalate to human"]
+    end
+
+    PLAN_WT --> stage
+
+    %% ── Stage Loop ─────────────────────────────────────
+    stage --> STAGE_CHK{"More\nstages?"}
+    STAGE_CHK -->|"Yes"| PLAN_WT
+    STAGE_CHK -->|"No"| RETRO
+
+    %% ── Post-Execution ─────────────────────────────────
+    RETRO["Retrospective\n<i>wf-skill-retrospective</i>\n\nAnalyse patterns, metrics,\ngenerate improvements"]
+    RETRO -->|"retrospective/&lt;sprint-id&gt;.md"| LEARN
+
+    LEARN["Continuous Learning\n<i>wf-skill-continuous-learning</i>\n\nExtract lessons → deduplicate →\nenforce capacity → archive"]
+    LEARN -->|"docs/MEMORY.yaml\n(updated)"| PUBLISH
+
+    PUBLISH["Publishing\n\ngit push sprint branch\ngh pr create → main\nAppend to trends.yaml"]
+    PUBLISH --> IDLE(["Pipeline idle"])
+
+    %% ── Feedback to next sprint ────────────────────────
+    LEARN -.->|"Lessons feed\nnext sprint"| SWA
+
+    %% ── Design issue resolution ────────────────────────
+    HALT_DI -.->|"Requires architect\nresolution"| SA
+
+    %% ── Hooks (mechanical enforcement) ─────────────────
+    subgraph hooks ["Hooks (fire on Edit/Write/Bash)"]
+        direction LR
+        H1["scope-audit\n<i>files ⊆ files_to_touch</i>"]
+        H2["suppression-scan\n<i>no @ts-ignore, nolint…</i>"]
+        H3["import-direction\n<i>COMPONENTS.yaml rules</i>"]
+        H4["tdd-evidence\n<i>red-phase verification</i>"]
+        H5["component-size ⚠️\n<i>max files/symbols</i>"]
+        H6["arch-staleness ⚠️\n<i>ARCHITECTURE.md current?</i>"]
+        H7["retry-loop-detector\n<i>same cmd 3× → block</i>"]
+    end
+    hooks -.->|"Block (exit 2)\nor warn"| BUILD
+
+    %% ── Cross-cutting skills ───────────────────────────
+    subgraph xcut ["Cross-cutting Skills (always active)"]
+        direction LR
+        X1["Scope Guard"]
+        X2["Verification"]
+        X3["Root-Cause Tracing"]
+        X4["Receiving Feedback"]
+        X5["Testing Anti-Patterns"]
+        X6["Observability"]
+    end
+    xcut -.->|"Consulted by\nbuild + review"| stage
+
+    %% ── Styling ────────────────────────────────────────
+    classDef manualNode fill:#4a90d9,stroke:#2c5aa0,color:#fff
+    classDef autoNode fill:#2ecc71,stroke:#1a9850,color:#fff
+    classDef haltNode fill:#e74c3c,stroke:#c0392b,color:#fff
+    classDef hookNode fill:#f39c12,stroke:#d68910,color:#fff
+    classDef xcutNode fill:#9b59b6,stroke:#7d3c98,color:#fff
+    classDef idleNode fill:#95a5a6,stroke:#7f8c8d,color:#fff
+
+    class STRAT,SA,SWA manualNode
+    class PIPELINE,BRANCH,TOPO,PLAN_WT,BUILD,REVIEW,MERGE,DONE,RETRO,LEARN,PUBLISH autoNode
+    class HALT_DI,HALT_ESC,HALT_MC haltNode
+    class H1,H2,H3,H4,H5,H6,H7 hookNode
+    class X1,X2,X3,X4,X5,X6 xcutNode
+    class IDLE idleNode
 ```
 
 ---
@@ -601,6 +718,11 @@ When the pipeline surfaces a design issue:
 3. Run `/wf-command-swa` to re-detail affected tasks
 4. Run `/wf-command-pipeline` to re-execute
 
+### Upgrading after toolkit update
+
+1. Run `install.sh` to update skills, commands, and hooks
+2. In each project: `/wf-command-init migrate` to update config and directory structure
+
 ### Resuming after an interruption
 
 ```
@@ -635,6 +757,9 @@ Run `/wf-command-sa` to create the master backlog from the roadmap.
 
 ### "No roadmap.yaml found"
 Either run `/wf-command-strategist` to create a product roadmap, or if you already have a `master_backlog.yaml`, run `/wf-command-sa` directly — it will operate in ongoing mode without a roadmap.
+
+### Config is missing new sections (models, learning, observability)
+Run `/wf-command-init migrate` — it will detect missing sections and add them with defaults.
 
 ### "No config.yaml found"
 Run `/wf-command-init` first to bootstrap the project.

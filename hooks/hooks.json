@@ -38,6 +38,11 @@
             "type": "command",
             "command": "hooks/architecture-staleness-check.sh",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "hooks/post-build-tdd-evidence.sh",
+            "timeout": 30
           }
         ]
       }

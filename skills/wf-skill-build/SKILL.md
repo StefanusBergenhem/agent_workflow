@@ -74,8 +74,18 @@ Read the log file after the command completes. This prevents terminal flooding a
 ### Red Phase
 1. Create or modify the test file(s) listed in `files_to_touch`.
 2. Implement every test case from `testing_mandate` in the contract.
-3. Run the tests and **confirm they FAIL** — the implementation does not exist yet.
-4. **Record the failure output.** Save the key failure lines. This is TDD evidence that the Reviewer will verify.
+3. **Before running tests, verify each test against the anti-pattern checklist:**
+   - Asserts observable behavior, not internal method calls or implementation details (#1)
+   - Uses real or in-memory fake implementations for code you own; mocks only at external boundaries (#2)
+   - Has assertions specific enough to fail if the implementation were deleted or returned a trivial value (#3)
+   - Tests through public interfaces only — no `_private` method access (#4)
+   - Uses targeted assertions, not snapshot matching (unless testing a genuinely stable serialization format) (#5)
+   - Test name follows `test_<action>_<scenario>_<expected_result>` — failure message alone tells you what broke (#6)
+   - Each test creates its own state — no shared mutable variables across tests (#7)
+   - Covers error paths, boundary conditions, and edge cases — not just the happy path (#8)
+   - Uses parameterized tests for input variations instead of copy-pasting test blocks (#9)
+4. Run the tests and **confirm they FAIL** — the implementation does not exist yet.
+5. **Record the failure output.** Save the key failure lines. This is TDD evidence that the Reviewer will verify.
 
 If tests pass before implementation exists, something is wrong — you are either testing the wrong thing or the feature already exists. HALT and investigate.
 
