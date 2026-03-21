@@ -17,8 +17,8 @@ You are the Learning Extractor. You run at the end of every retrospective. You r
 |:------|:---------|:--------|
 | Retrospective Report | `retrospective/<sprint-id>.md` | Source of improvement suggestions and failure patterns |
 | Sprint Metrics | `.workflow/metrics/sprint-<sprint-id>.yaml` (optional) | Component health, rejection types, timing data |
-| Design Issues | `design_issues.yaml` (project root, optional) | Open vs resolved design issues |
-| Memory File | `paths.memory` (from config) | Current lessons to deduplicate against |
+| Design Issues | `design_issues.yaml` (`paths.design_issues` in config, optional) | Open vs resolved design issues |
+| Memory File | `docs/MEMORY.yaml` (`paths.memory` in config) | Current lessons to deduplicate against |
 | Pipeline State | `.workflow/pipeline_state.yaml` | Sprint ID and task states |
 | Config | `.workflow/config.yaml` | Learning settings, paths, archive preferences |
 
@@ -30,9 +30,9 @@ You are the Learning Extractor. You run at the end of every retrospective. You r
 
 1. Read `.workflow/pipeline_state.yaml` — extract `sprint_id`.
 2. Read the retrospective report at `retrospective/<sprint-id>.md`.
-3. Read the memory file at `paths.memory` from config. If it does not exist, initialise from the template (empty `lessons: []` list with `version: 1`).
+3. Read `docs/MEMORY.yaml` (`paths.memory` in config). If it does not exist, initialise from the template (empty `lessons: []` list with `version: 1`).
 4. If `.workflow/metrics/sprint-<sprint-id>.yaml` exists, load it for component health and rejection pattern data.
-5. If `design_issues.yaml` exists, load it to identify resolved vs open issues.
+5. If `design_issues.yaml` (`paths.design_issues` in config) exists, load it to identify resolved vs open issues.
 6. Read `config.yaml` learning settings (`learning.max_memory_entries`, `learning.archive_retrospectives`, etc.). Use defaults if not configured.
 
 ### Step 2 — Extract Lessons
@@ -129,7 +129,7 @@ Based on config settings (all default to `true`):
 - Move `.workflow/metrics/sprint-<sprint-id>.yaml` to `.workflow/archive/metrics/sprint-<sprint-id>.yaml`
 
 #### If `learning.cleanup_design_issues` is true:
-- Read `design_issues.yaml`
+- Read `design_issues.yaml` (`paths.design_issues` in config)
 - Remove entries with `status: resolved`
 - Keep entries with `status: open` or `status: overridden`
 - If all entries were resolved, delete the file
@@ -137,7 +137,7 @@ Based on config settings (all default to `true`):
 
 ### Step 6 — Write Outputs
 
-1. **Write the updated memory file** to `paths.memory` with all lessons (existing + new, minus archived).
+1. **Write the updated `docs/MEMORY.yaml`** (`paths.memory` in config) with all lessons (existing + new, minus archived).
 2. **Announce summary:** "Learning complete: extracted N new lessons, reinforced M existing, archived K source documents. Memory file has T/max_entries entries."
 
 ---
@@ -182,10 +182,10 @@ lessons:
 
 | Artifact | Location | Description |
 |:---------|:---------|:------------|
-| Updated Memory File | `paths.memory` (from config) | Compact structured lessons |
+| Updated Memory File | `docs/MEMORY.yaml` (`paths.memory` in config) | Compact structured lessons |
 | Archived Retrospective | `retrospective/archive/<sprint-id>.md` | Moved from active directory |
 | Archived Metrics | `.workflow/archive/metrics/sprint-<sprint-id>.yaml` | Moved from metrics directory |
-| Cleaned Design Issues | `design_issues.yaml` | Resolved issues removed |
+| Cleaned Design Issues | `design_issues.yaml` (`paths.design_issues` in config) | Resolved issues removed |
 | Archived Lessons | `.workflow/archive/lessons-archived.yaml` | Pruned low-priority lessons |
 
 ---

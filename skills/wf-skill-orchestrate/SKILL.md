@@ -17,7 +17,7 @@ You are the Pipeline Controller. You are a thin state machine executor. You read
 |:------|:---------|:--------|
 | Pipeline State | `.workflow/pipeline_state.yaml` | Current phase, gate status, attempt counters, stage info |
 | Config | `config.yaml` | Project-level settings, paths, commands, parallel config |
-| Sprint File | `sprint.yaml` (project root) | Task contracts produced by SwA |
+| Sprint File | `sprint.yaml` (`paths.sprint` in config) | Task contracts produced by SwA |
 
 ---
 
@@ -38,7 +38,7 @@ build → review → APPROVED → merge to sprint branch, mark completed
                → REJECTED → increment attempt_counter
                            → attempt_counter < max_attempts → build (Fix Mode)
                            → attempt_counter >= max_attempts → escalated
-               → DESIGN_ISSUE → write design_issues.yaml, halt task, continue others
+               → DESIGN_ISSUE → write to design_issues.yaml, halt task, continue others
 ```
 
 ### Valid States
@@ -47,7 +47,7 @@ build → review → APPROVED → merge to sprint branch, mark completed
 |:------|:------------|:------------|
 | `idle` | No active work or pipeline entry point. | Run resume detection. |
 | `creating_sprint_branch` | Creating a dedicated branch for the sprint. | Create branch from main, record in state. See [GIT_OPERATIONS.md](GIT_OPERATIONS.md). |
-| `computing_stages` | Computing dependency stages from sprint.yaml tasks. | Run stage computation. |
+| `computing_stages` | Computing dependency stages from sprint file tasks. | Run stage computation. |
 | `planning_worktrees` | Creating git worktrees for all tasks in the current stage. | See [GIT_OPERATIONS.md](GIT_OPERATIONS.md). |
 | `executing_stage` | Tasks in the current stage are building/reviewing in parallel worktrees. | Monitor task progress. |
 | `stage_complete` | All tasks in stage are completed or escalated. | Check for next stage or retrospective. |
@@ -69,14 +69,14 @@ Key fields: `current_phase`, `sprint_branch`, `stages.definitions`, `task_states
 
 **Before acting on any `idle` state**, run resume detection:
 
-1. Check if `sprint.yaml` exists in the project root.
-2. If the sprint file exists and contains incomplete tasks (status != `done`):
+1. Check if `sprint.yaml` (`paths.sprint` in config) exists.
+2. If `sprint.yaml` exists and contains incomplete tasks (status != `done`):
    - Check if `sprint_branch` is set in `pipeline_state.yaml` — if not, transition to `creating_sprint_branch`.
    - Check if `.workflow/stage_manifest.yaml` exists → if yes, transition directly to `executing_stage` (worktrees are ready).
    - Check if `stages.definitions` is populated in `pipeline_state.yaml` → if yes, transition to `planning_worktrees`.
    - Otherwise → transition to `computing_stages` (sprint exists, stages not yet computed).
    - Update `pipeline_state.yaml` with the new phase and a `reason: "Resumed mid-sprint"` history entry.
-3. If no sprint file exists → HALT. Tell the user to run `/wf-command-swa` to produce `sprint.yaml`.
+3. If `sprint.yaml` does not exist → HALT. Tell the user to run `/wf-command-swa` to produce `sprint.yaml`.
 4. If all tasks are complete → transition to `retrospective` (sprint done, retrospective pending).
 
 **Metrics initialization:** If `config.observability.enabled` is true (default), create `.workflow/metrics/` directory if needed and initialize `.workflow/metrics/sprint-<sprint-id>.yaml` with sprint metadata and model config. If resuming mid-sprint and the metrics file already exists, do not overwrite. See `skills/wf-skill-observability/SKILL.md` for the initialization schema.
@@ -95,7 +95,7 @@ See [DISPATCH.md](DISPATCH.md) for the full dispatch protocol, context envelopes
 
 When transitioning to `computing_stages`:
 
-1. **Read `sprint.yaml`.** Collect all tasks with status `pending` or `blocked`, including their `depends_on` declarations.
+1. **Read `sprint.yaml`** (`paths.sprint` in config). Collect all tasks with status `pending` or `blocked`, including their `depends_on` declarations.
 
 2. **Build a dependency graph.** Each task is a node. Each `depends_on` is a directed edge.
 
@@ -106,7 +106,7 @@ When transitioning to `computing_stages`:
    - Stage N: all tasks whose dependencies are ALL satisfied by stages 1 through N-1
    - Tasks within a stage have no dependencies on each other — they are safe to run in parallel
 
-5. **Handle blocked tasks.** Tasks with `status: "blocked"` in sprint.yaml (design issues from SwA) remain blocked. Skip them during stage computation and add to `blocked_tasks`.
+5. **Handle blocked tasks.** Tasks with `status: "blocked"` in `sprint.yaml` (design issues from SwA) remain blocked. Skip them during stage computation and add to `blocked_tasks`.
 
 6. **Write stage definitions** and **initialize task_states** in `pipeline_state.yaml` (see [SCHEMAS.md](SCHEMAS.md) for format).
 
@@ -123,7 +123,7 @@ When in `planning_worktrees`:
 3. For each task in the stage:
    - Read the task contract from `sprint.yaml`
    - Create git worktree — see [GIT_OPERATIONS.md](GIT_OPERATIONS.md) for commands
-   - Write `.workflow/current_task.yaml` in each worktree (extract the task's contract from sprint.yaml into the standard task contract format)
+   - Write `.workflow/current_task.yaml` in each worktree (extract the task's contract from `sprint.yaml` into the standard task contract format)
    - Run baseline preflight in each worktree
 4. Write `.workflow/stage_manifest.yaml` listing all worktrees and contracts.
 5. Update `task_states` with branch and worktree path for each task.
@@ -149,7 +149,7 @@ When in `executing_stage`:
 
 6. **On task escalation:** Mark the task as `escalated` in `task_states`. Run escalation propagation (see below). Other tasks in the current stage continue unaffected.
 
-7. **On design issue:** When a build or review sub-agent writes to `design_issues.yaml`:
+7. **On design issue:** When a build or review sub-agent writes to `design_issues.yaml` (`paths.design_issues` in config):
    - Mark the task as `design_issue` in `task_states`
    - Add entry to `design_issues` in `pipeline_state.yaml`
    - Do NOT retry — the issue is architectural, not code-level
@@ -251,12 +251,12 @@ When all stages are complete (or all remaining tasks are blocked/escalated):
 | State file missing | Create with `current_phase: idle`. |
 | State file corrupted | HALT. Present to human. Do not guess. |
 | Config file missing | HALT. Cannot resolve paths without config. |
-| sprint.yaml missing | HALT. Tell user to run `/wf-command-swa`. |
+| `sprint.yaml` missing | HALT. Tell user to run `/wf-command-swa`. |
 | Sub-agent output missing | Report to human. Do not retry automatically. |
 | Git conflicts during merge | Abort merge. Escalate to human. Do not auto-resolve. |
 | Worktree creation fails | HALT for that task. Other tasks continue. |
 | Dependency cycle detected | HALT. Report cycle to human. |
-| design_issues.yaml written | Mark task as design_issue. Block dependents. Notify human. |
+| `design_issues.yaml` written | Mark task as design_issue. Block dependents. Notify human. |
 | Sprint branch creation fails | HALT. Ask human whether to reuse or rename. |
 | PR creation fails | HALT. Report to human (e.g., `gh` not authenticated). |
 

@@ -19,9 +19,9 @@ You are the QA Reviewer. You validate the Developer's work against the Architect
 | Review Ready | `.workflow/review_ready.yaml` | What was claimed done (the Developer's report) |
 | Git Diff | `git diff origin/main` | What actually changed (ground truth) |
 | Config | `config.yaml` | Project-level settings, paths, commands |
-| Memory | `paths.memory` (from config) | Known rule violations, past lessons |
-| Conventions | `paths.conventions` (from config) | Code style and pattern rules |
-| Components | `COMPONENTS.yaml` (project root) | Component registry and dependency rules |
+| Memory | `docs/MEMORY.yaml` (`paths.memory` in config) | Known rule violations, past lessons |
+| Conventions | `docs/CONVENTIONS.md` (`paths.conventions` in config) | Code style and pattern rules |
+| Components | `COMPONENTS.yaml` (`paths.components` in config) | Component registry and dependency rules |
 | Architecture | Relevant `ARCHITECTURE.md` | Ownership declarations for the task's component |
 
 ---
@@ -32,7 +32,7 @@ You are the QA Reviewer. You validate the Developer's work against the Architect
 
 Before starting the QA checklist, check if `review_ready.yaml` has `status: design_issue`. If so:
 - Read the `design_issue_id` from the file
-- Confirm the corresponding entry exists in `design_issues.yaml`
+- Confirm the corresponding entry exists in `design_issues.yaml` (`paths.design_issues` in config)
 - Report the design issue to the orchestrator
 - Do NOT proceed with the QA checklist — the task is halted
 
@@ -44,7 +44,7 @@ Read in this exact order:
 3. Run `git diff origin/main` — the actual changes (ground truth)
 4. Memory file — check for known rule violations and past mistakes
 5. Conventions file(s) — the coding standards the implementation must follow
-6. `COMPONENTS.yaml` — component registry and dependency rules
+6. `COMPONENTS.yaml` (`paths.components` in config) — component boundaries and dependency rules
 7. Relevant `ARCHITECTURE.md` for the task's component — ownership declarations
 
 **The diff is the source of truth.** If the claim in `review_ready.yaml` contradicts the diff, the diff wins.
@@ -60,7 +60,7 @@ Execute the checklist in priority order. Stop at the first P0 failure — do not
 | 0.1 | **Security scan** | Scan the diff for: SQL injection (string concatenation in queries), XSS (`dangerouslySetInnerHTML`, raw DOM insertion), hardcoded credentials/secrets, auth bypass (endpoints without auth middleware), input validation gaps (missing type/length/enum checks), secret exposure in error messages | REJECT with `security_violation` |
 | 0.2 | **Scope audit** | Compare `git diff --name-only origin/main` against `files_to_touch` in the contract. Every modified file MUST be in the contract's scope. | REJECT with `scope_violation` |
 | 0.3 | **Acceptance criteria** | Re-read each criterion in `acceptance_criteria`. For each one, find the specific code or test in the diff that satisfies it. If any criterion is not demonstrably met, reject. | REJECT with `acceptance_criteria_unmet` |
-| 0.4 | **Architecture compliance** | Check that modified files belong to the correct component per `COMPONENTS.yaml`. Verify the task's component owns the concepts being implemented per `ARCHITECTURE.md`. Check that any new imports respect `dependency_rules`. | REJECT with `architecture_violation` or write design issue |
+| 0.4 | **Architecture compliance** | Check that modified files belong to the correct component per `COMPONENTS.yaml` (`paths.components` in config). Verify the task's component owns the concepts being implemented per `ARCHITECTURE.md`. Check that any new imports respect `dependency_rules`. | REJECT with `architecture_violation` or write design issue |
 
 #### P1 — Test Quality (any failure = REJECT)
 
@@ -106,7 +106,7 @@ The architecture compliance check (P0.4) is expanded here:
    - If the task implements something in the "Does NOT Own" section, flag it
 
 4. **If architecture violation is design-level** (wrong boundary, not just wrong code):
-   - Write to `design_issues.yaml` instead of rejecting:
+   - Write to `design_issues.yaml` (`paths.design_issues` in config) instead of rejecting:
      ```yaml
      issues:
        - id: "DI-<next_number>"
@@ -127,11 +127,11 @@ The architecture compliance check (P0.4) is expanded here:
 
 Execute the approval workflow:
 
-1. **Mark task done in sprint file.** Update the task's `status` to `done` in `sprint.yaml`.
+1. **Mark task done in sprint file.** Update the task's `status` to `done` in `sprint.yaml` (`paths.sprint` in config).
 
-2. **Update state.** If any infrastructure facts, deferred items, or known issues changed, update the state file (`paths.state` from config).
+2. **Update state.** If any infrastructure facts, deferred items, or known issues changed, update `docs/STATE.md` (`paths.state` in config).
 
-3. **Update memory (optional).** If the work solved a recurring problem or revealed a lesson worth preserving, add a structured entry to the memory file (`paths.memory` from config). Use the YAML format with `id`, `category`, `rule`, `evidence`, and `confidence` fields. The continuous-learning skill will consolidate and deduplicate at sprint end — partial or rough entries are fine here.
+3. **Update memory (optional).** If the work solved a recurring problem or revealed a lesson worth preserving, add a structured entry to `docs/MEMORY.yaml` (`paths.memory` in config). Use the YAML format with `id`, `category`, `rule`, `evidence`, and `confidence` fields. The continuous-learning skill will consolidate and deduplicate at sprint end — partial or rough entries are fine here.
 
 4. **Update architecture docs.** If the work established a new architectural pattern or constraint, add a one-sentence entry to the ADR/architecture doc explaining the decision and its rationale.
 
@@ -227,4 +227,4 @@ Stop and report to the human if:
 - A security vulnerability is found (P0 — report immediately, do not continue the checklist)
 - The diff shows changes to files not in `files_to_touch` AND not in the contract's scope
 - The preflight command is not configured and cannot be determined
-- A design-level architecture violation is discovered (write design_issues.yaml)
+- A design-level architecture violation is discovered (write to `design_issues.yaml` (`paths.design_issues` in config))

@@ -86,7 +86,7 @@ Sometimes you genuinely discover that a file outside scope needs changing (e.g.,
 
 When determining which component owns a file (used by build, review, and swa skills):
 
-1. **Longest prefix match**: A file belongs to the component whose `path` in `COMPONENTS.yaml` is the longest prefix match for that file's path.
+1. **Longest prefix match**: A file belongs to the component whose `path` in `COMPONENTS.yaml` (`paths.components` in config) is the longest prefix match for that file's path.
 2. **No match**: If no component path matches, the file is unowned — HALT and report.
 3. **Shared utilities**: Ownership belongs to the component that *defines* the interface, not its consumers.
 

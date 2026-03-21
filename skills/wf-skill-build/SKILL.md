@@ -19,7 +19,7 @@ You are the Lead Developer. You execute the contract in `.workflow/current_task.
 | Feedback (Fix Mode) | `.workflow/feedback.yaml` | What to fix — only present if rejected by Reviewer |
 | Context Files | Listed in `context_to_load` | ONLY these files. No speculative exploration. |
 | Config | `config.yaml` | Project-level settings, paths, commands |
-| Components | `COMPONENTS.yaml` (project root) | Component boundaries and dependency rules (for design issue detection) |
+| Components | `COMPONENTS.yaml` (`paths.components` in config) | Component boundaries and dependency rules (for design issue detection) |
 
 ---
 
@@ -33,11 +33,11 @@ You are the Lead Developer. You execute the contract in `.workflow/current_task.
 ## Step 1 — Load Context (Build Mode)
 
 1. Read `config.yaml` to resolve project-level settings and commands.
-2. Read the memory file (`paths.memory` from config) if it exists — contains hard-won debugging lessons. Failing to read this risks repeating past mistakes.
+2. Read `docs/MEMORY.yaml` (`paths.memory` in config) if it exists — contains hard-won debugging lessons. Failing to read this risks repeating past mistakes.
 3. Load ONLY the files listed in `context_to_load`. No speculative exploration outside that list.
 4. If the task has `depends_on`, verify that dependency is merged into the current branch. If not, HALT and report.
    - **Worktree mode:** When running inside a worktree (parallel stage execution), `depends_on` tasks from prior stages are already merged into `origin/main` from which the worktree branched. Only check for dependencies within the same stage.
-5. Read `COMPONENTS.yaml` if it exists — needed for design issue detection (Step 3b).
+5. Read `COMPONENTS.yaml` (`paths.components` in config) if it exists — needed for design issue detection (Step 3b).
 
 ---
 
@@ -105,7 +105,7 @@ During implementation, if you encounter a situation where the failure is NOT in 
 
 **When you detect a design issue:**
 
-1. Write to `design_issues.yaml` in the project root (append if file exists):
+1. Write to `design_issues.yaml` (`paths.design_issues` in config), append if file exists:
    ```yaml
    issues:
      - id: "DI-<next_number>"
@@ -265,4 +265,4 @@ Stop immediately and report to the human if:
 - A dependency declared in `depends_on` has not been merged
 - The preflight command is not configured and cannot be determined
 - You discover a security vulnerability in existing code (report it, do not fix it in this task)
-- A design-level problem is detected (write design_issues.yaml and HALT — do not retry)
+- A design-level problem is detected (write to `design_issues.yaml` (`paths.design_issues` in config) and HALT — do not retry)

@@ -17,10 +17,10 @@ You think out loud — showing your reasoning, presenting alternatives, and usin
 
 | Input | Location | Purpose |
 |:------|:---------|:--------|
-| Roadmap | `roadmap.yaml` (project root, optional) | Feature roadmap (from Strategist). Triggers roadmap mode when present. |
-| Components | `COMPONENTS.yaml` (project root) | Current component registry |
-| Architecture Docs | `config.yaml → paths.architecture_docs` globs | Per-module ARCHITECTURE.md, ADRs, design docs |
-| Master Backlog | `master_backlog.yaml` (project root) | Existing backlog to update (roadmap mode) or primary input (ongoing mode) |
+| Roadmap | `roadmap.yaml` (`paths.roadmap` in config, optional) | Feature roadmap (from Strategist). Triggers roadmap mode when present. |
+| Components | `COMPONENTS.yaml` (`paths.components` in config) | Current component registry |
+| Architecture Docs | `paths.architecture_docs` in config (globs) | Per-module ARCHITECTURE.md, ADRs, design docs |
+| Master Backlog | `master_backlog.yaml` (`paths.master_backlog` in config) | Existing backlog to update (roadmap mode) or primary input (ongoing mode) |
 | Config | `.workflow/config.yaml` | Project paths and settings |
 
 ---
@@ -45,8 +45,8 @@ Diagrams are **ephemeral conversation tools** for the human. They make architect
 
 Determine the operating mode based on available inputs:
 
-- **Roadmap mode** — `roadmap.yaml` exists. You are translating a product roadmap into technical strategy. Every backlog item must trace to a roadmap feature.
-- **Ongoing mode** — No `roadmap.yaml`, but `master_backlog.yaml` exists. You are evaluating current system health, updating architecture, and cutting the next sprint from the existing backlog.
+- **Roadmap mode** — `roadmap.yaml` (`paths.roadmap` in config) exists. You are translating a product roadmap into technical strategy. Every backlog item must trace to a roadmap feature.
+- **Ongoing mode** — No `roadmap.yaml`, but `master_backlog.yaml` (`paths.master_backlog` in config) exists. You are evaluating current system health, updating architecture, and cutting the next sprint from the existing backlog.
 
 If neither file exists, HALT: suggest running `/wf-command-strategist` to create a roadmap, or creating a `master_backlog.yaml` manually.
 
@@ -54,11 +54,11 @@ If neither file exists, HALT: suggest running `/wf-command-strategist` to create
 
 1. Read `.workflow/config.yaml` for project paths and settings.
 2. **Load the driving input:**
-   - *Roadmap mode:* Read `roadmap.yaml` to understand what needs to be built.
-   - *Ongoing mode:* Read `master_backlog.yaml` to understand what is planned, in progress, and completed. This is your primary input.
-3. Read `COMPONENTS.yaml` to understand the current system structure.
-4. Expand every glob in `config.yaml → paths.architecture_docs` and read the matching files. These include per-module `ARCHITECTURE.md` files, ADRs, design documents, and any other registered architectural knowledge. If the set is large (>20 files), read titles/headers first and prioritize docs relevant to the components being touched.
-5. Read `master_backlog.yaml` if it exists and was not already read in step 2 — check what is already planned or in progress.
+   - *Roadmap mode:* Read `roadmap.yaml` (`paths.roadmap` in config) to understand what needs to be built.
+   - *Ongoing mode:* Read `master_backlog.yaml` (`paths.master_backlog` in config) to understand what is planned, in progress, and completed. This is your primary input.
+3. Read `COMPONENTS.yaml` (`paths.components` in config) to understand the current system structure.
+4. Expand every glob in `paths.architecture_docs` and read the matching files. These include per-module `ARCHITECTURE.md` files, ADRs, design documents, and any other registered architectural knowledge. If the set is large (>20 files), read titles/headers first and prioritize docs relevant to the components being touched.
+5. Read `master_backlog.yaml` (`paths.master_backlog` in config) if it exists and was not already read in step 2 — check what is already planned or in progress.
 
 If `COMPONENTS.yaml` does not exist, you are working on a new project. Create it from scratch based on the roadmap (or backlog) and any existing source structure.
 
@@ -74,7 +74,7 @@ This sets shared context before decisions begin.
 
 Assess the current system health before planning new work.
 
-Run four fitness checks against `COMPONENTS.yaml` and the codebase:
+Run four fitness checks against `COMPONENTS.yaml` (`paths.components` in config) and the codebase:
 
 1. **Component size** — flag components exceeding `constraints.max_source_files` or `constraints.max_exported_symbols`
 2. **Dependency direction** — flag imports violating `dependency_rules`
@@ -192,7 +192,7 @@ Present findings feature-by-feature (or in small clusters for simple items). Use
 
 Based on the design decisions agreed in Phase 3:
 
-**Update `COMPONENTS.yaml`:**
+**Update `COMPONENTS.yaml` (`paths.components` in config):**
 - Add new components if needed
 - Update `owns`, `exposes`, `depends_on` for affected components
 - Update `constraints` if growth requires it (explain why)
@@ -281,9 +281,9 @@ Explain the ordering rationale: why these sprint boundaries, what the dependency
 1. Present a brief summary of all decisions made across phases — not a re-presentation of everything, just the key choices and their rationale.
 2. Ask for final write approval.
 3. On approval, write:
-   - Updated `COMPONENTS.yaml`
+   - Updated `COMPONENTS.yaml` (`paths.components` in config)
    - Updated/new `ARCHITECTURE.md` files
-   - `master_backlog.yaml`
+   - `master_backlog.yaml` (`paths.master_backlog` in config)
 
 ---
 
@@ -291,9 +291,9 @@ Explain the ordering rationale: why these sprint boundaries, what the dependency
 
 | Artifact | Location | Description |
 |:---------|:---------|:------------|
-| Component Registry | `COMPONENTS.yaml` (project root) | Updated component definitions and dependency rules |
+| Component Registry | `COMPONENTS.yaml` (`paths.components` in config) | Updated component definitions and dependency rules |
 | Architecture Docs | `*/ARCHITECTURE.md` (per module) | Updated per-module architecture documentation |
-| Master Backlog | `master_backlog.yaml` (project root) | Ordered technical backlog with sprint groupings |
+| Master Backlog | `master_backlog.yaml` (`paths.master_backlog` in config) | Ordered technical backlog with sprint groupings |
 
 ---
 
@@ -326,7 +326,7 @@ These are checks you run to assess architecture health. They inform your decisio
 ## Halt Conditions
 
 Stop and report to the human if:
-- Neither `roadmap.yaml` nor `master_backlog.yaml` exists (run `/wf-command-strategist` to create a roadmap, or create a `master_backlog.yaml` manually)
+- Neither `roadmap.yaml` (`paths.roadmap` in config) nor `master_backlog.yaml` (`paths.master_backlog` in config) exists (run `/wf-command-strategist` to create a roadmap, or create a `master_backlog.yaml` manually)
 - A roadmap feature requires a component restructuring that would break in-progress work
 - Two components have irreconcilable ownership claims over the same concept
 - A circular dependency between components cannot be resolved without significant refactoring

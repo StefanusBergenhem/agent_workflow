@@ -16,13 +16,13 @@ You are the Retrospective Analyst. You run at the end of every sprint pipeline e
 | Input | Location | Purpose |
 |:------|:---------|:--------|
 | Pipeline State | `.workflow/pipeline_state.yaml` | Task states, attempt counts, escalations, blocked tasks |
-| Sprint File | `sprint.yaml` (project root) | Original task contracts and sprint goal |
-| Design Issues | `design_issues.yaml` (project root, optional) | Issues surfaced during execution |
+| Sprint File | `sprint.yaml` (`paths.sprint` in config) | Original task contracts and sprint goal |
+| Design Issues | `design_issues.yaml` (`paths.design_issues` in config, optional) | Issues surfaced during execution |
 | Config | `.workflow/config.yaml` | Project settings |
 | Git Log | `git log` for the sprint | What was actually committed |
 | Sprint Metrics | `.workflow/metrics/sprint-<sprint-id>.yaml` (optional) | Timing, cost, and per-task quantitative data |
 | Trends | `.workflow/metrics/trends.yaml` (optional) | Cross-sprint comparison data |
-| Memory File | `paths.memory` (from config) | Current lessons — needed by continuous learning protocol |
+| Memory File | `docs/MEMORY.yaml` (`paths.memory` in config) | Current lessons — needed by continuous learning protocol |
 | Learning Skill | `skills/wf-skill-continuous-learning/SKILL.md` | Lesson extraction and archival protocol |
 
 ---
@@ -37,12 +37,12 @@ You are the Retrospective Analyst. You run at the end of every sprint pipeline e
    - Stage progression (how many stages, any stalls)
    - History log (state transitions and timestamps)
 
-2. Read `sprint.yaml` — extract:
+2. Read `sprint.yaml` (`paths.sprint` in config) — extract:
    - Sprint goal and task list
    - Original acceptance criteria per task
    - Risk ratings
 
-3. Read `design_issues.yaml` if it exists — extract all issues surfaced during this sprint.
+3. Read `design_issues.yaml` (`paths.design_issues` in config) if it exists — extract all issues surfaced during this sprint.
 
 4. Read git log for the sprint period:
    ```bash
@@ -211,7 +211,7 @@ After writing the retrospective report, load `skills/wf-skill-continuous-learnin
 4. Archives the retrospective report and sprint metrics to archive directories
 5. Cleans resolved design issues from `design_issues.yaml`
 
-The memory file at `paths.memory` is the durable output — it carries refined lessons forward to future sprints where build, review, and SWA skills consume them.
+`docs/MEMORY.yaml` (`paths.memory` in config) is the durable output — it carries refined lessons forward to future sprints where build, review, and SWA skills consume them.
 
 ---
 
@@ -220,7 +220,7 @@ The memory file at `paths.memory` is the durable output — it carries refined l
 | Artifact | Location | Description |
 |:---------|:---------|:------------|
 | Retrospective Report | `retrospective/<sprint-id>.md` | Structured analysis of sprint execution |
-| Updated Memory File | `paths.memory` (from config) | Refined lessons extracted from this sprint (via continuous learning protocol) |
+| Updated Memory File | `docs/MEMORY.yaml` (`paths.memory` in config) | Refined lessons extracted from this sprint (via continuous learning protocol) |
 
 ---
 
@@ -238,5 +238,5 @@ The memory file at `paths.memory` is the durable output — it carries refined l
 
 Stop and report if:
 - `pipeline_state.yaml` does not exist or is corrupted
-- `sprint.yaml` does not exist
+- `sprint.yaml` (`paths.sprint` in config) does not exist
 - The sprint has no completed or escalated tasks (nothing to analyse)

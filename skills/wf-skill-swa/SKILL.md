@@ -15,12 +15,12 @@ You are the Software Architect. You take the next sprint cut from the master bac
 
 | Input | Location | Purpose |
 |:------|:---------|:--------|
-| Master Backlog | `master_backlog.yaml` (project root) | Next sprint group to detail |
-| Components | `COMPONENTS.yaml` (project root) | Component boundaries and dependency rules |
+| Master Backlog | `master_backlog.yaml` (`paths.master_backlog` in config) | Next sprint group to detail |
+| Components | `COMPONENTS.yaml` (`paths.components` in config) | Component boundaries and dependency rules |
 | Architecture Docs | `*/ARCHITECTURE.md` files | Per-module constraints and interfaces |
 | Source Code | Component `path` directories | Actual code to understand real interfaces |
 | Config | `.workflow/config.yaml` | Project paths, commands, sizing limits |
-| Memory | `paths.memory` (from config, optional) | Past lessons about contract quality and component rules |
+| Memory | `docs/MEMORY.yaml` (`paths.memory` in config, optional) | Past lessons about contract quality and component rules |
 
 ---
 
@@ -28,10 +28,10 @@ You are the Software Architect. You take the next sprint cut from the master bac
 
 ### Step 1 — Identify Next Sprint
 
-1. Read `master_backlog.yaml`.
+1. Read `master_backlog.yaml` (`paths.master_backlog` in config).
 2. Find the first sprint with status not `done` — this is the next sprint to detail.
 3. Read all items in that sprint group.
-4. Read `COMPONENTS.yaml` to understand component boundaries.
+4. Read `COMPONENTS.yaml` (`paths.components` in config) to understand component boundaries.
 5. Read relevant `ARCHITECTURE.md` files for affected components.
 
 ### Step 2 — Source Code Analysis
@@ -55,7 +55,7 @@ For each backlog item in the sprint:
 
 ### Step 2b — Consult Memory
 
-If the memory file exists at `paths.memory` (from config), read it. It contains structured lessons from past sprints. Apply relevant lessons when producing task contracts:
+If `docs/MEMORY.yaml` (`paths.memory` in config) exists, read it. It contains structured lessons from past sprints. Apply relevant lessons when producing task contracts:
 
 1. **`contract_patterns` lessons** — apply universally. These are rules about contract quality learned from past failures. Example: "Always include CONVENTIONS.md in context_to_load for tasks modifying existing code."
 
@@ -136,7 +136,7 @@ For each task contract:
 
 ### Step 5 — Flag Design Issues
 
-If you discover design-level problems during source analysis, write them to `design_issues.yaml`:
+If you discover design-level problems during source analysis, write them to `design_issues.yaml` (`paths.design_issues` in config):
 
 ```yaml
 issues:
@@ -214,8 +214,8 @@ Wait for human approval before writing.
 ### Step 9 — Write Artifacts
 
 On approval:
-1. Write `sprint.yaml` to the project root
-2. Write `design_issues.yaml` if any issues were found (append to existing if present)
+1. Write `sprint.yaml` (`paths.sprint` in config)
+2. Write `design_issues.yaml` (`paths.design_issues` in config) — append to existing if present
 
 ---
 
@@ -223,8 +223,8 @@ On approval:
 
 | Artifact | Location | Description |
 |:---------|:---------|:------------|
-| Sprint File | `sprint.yaml` (project root) | Full sprint with inline task contracts |
-| Design Issues | `design_issues.yaml` (project root, optional) | Design problems for architect review |
+| Sprint File | `sprint.yaml` (`paths.sprint` in config) | Full sprint with inline task contracts |
+| Design Issues | `design_issues.yaml` (`paths.design_issues` in config) | Design problems for architect review |
 
 ---
 
@@ -245,8 +245,8 @@ On approval:
 ## Halt Conditions
 
 Stop and report to the human if:
-- `master_backlog.yaml` does not exist (run `/wf-command-sa` first)
-- `COMPONENTS.yaml` does not exist (run `/wf-command-sa` first)
+- `master_backlog.yaml` (`paths.master_backlog` in config) does not exist (run `/wf-command-sa` first)
+- `COMPONENTS.yaml` (`paths.components` in config) does not exist (run `/wf-command-sa` first)
 - All sprints in the master backlog are marked `done`
 - A component's source directory doesn't exist at the declared path
 - More than 50% of tasks in the sprint are blocked by design issues
