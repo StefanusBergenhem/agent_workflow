@@ -14,7 +14,6 @@ paths:
   state: "docs/STATE.md"
   memory: "docs/MEMORY.yaml"
   architecture_docs:             # Globs — all matching files are read by SA
-    - "**/ARCHITECTURE.md"
     - "docs/adrs/*.md"
   conventions: "docs/CONVENTIONS.md"
   components: "COMPONENTS.yaml"
@@ -29,7 +28,13 @@ commands:
   type_check: "{{TYPE_CHECK_CMD}}"
   compile_check: "{{COMPILE_CHECK_CMD}}"
   preflight: "{{PREFLIGHT_CMD}}"
+  coverage: "{{COVERAGE_CMD}}"            # e.g., "npx jest --coverage", "go test -coverprofile=coverage.out ./...", "pytest --cov"
+  db_validate: "{{DB_VALIDATE_CMD}}"      # e.g., "npx prisma migrate status", "alembic check"
   context_map: "{{CONTEXT_MAP_CMD}}"
+
+coverage:
+  threshold: 90                            # Minimum line coverage % for new files
+  enforce_on_new_files: true               # Require coverage check on files created by the task
 
 review:
   max_attempts: 3
@@ -67,3 +72,32 @@ observability:
   trends:
     enabled: true                        # Track cross-sprint trends
     max_sprints: 20                      # Keep last N sprints in trends.yaml
+
+external_skills:
+  # External skills provide domain-specific guidance to build and review agents.
+  # Skills are merged (defaults + matching domain), never overridden.
+  #
+  # Resolution: for each slot, collect defaults + all matching domain skills.
+  # Example: a Go backend task gets implementation: ["tdd", "golang-patterns"]
+
+  defaults:
+    # Applied to ALL tasks regardless of domain.
+    implementation: []    # e.g., ["tdd"]
+    testing: []           # e.g., ["golang-testing"]
+    review: []            # e.g., ["requesting-code-review"]
+
+  domains:
+    # Each domain has glob patterns matched against files_to_touch.
+    # When a task's files match, domain skills are appended to defaults.
+    # If files span multiple domains, all matching domain skills are loaded.
+    #
+    # backend:
+    #   match: ["backend/**", "**/*.go", "cmd/**", "internal/**"]
+    #   skills:
+    #     implementation: ["golang-patterns"]
+    #     testing: ["golang-testing"]
+    # frontend:
+    #   match: ["frontend/**", "**/*.tsx", "**/*.ts", "src/components/**"]
+    #   skills:
+    #     implementation: ["frontend-patterns"]
+    #     testing: ["vitest"]

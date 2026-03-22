@@ -1,6 +1,6 @@
 ---
 name: wf-skill-sa
-description: Solution Architect that maintains technical strategy, component registry, architecture docs, and master backlog. Works in two modes — roadmap-driven (translate roadmap into architecture) or ongoing (evaluate system health, update architecture, cut next sprint from existing backlog).
+description: Solution Architect that maintains technical strategy, component registry, ADRs, and master backlog. Works in two modes — roadmap-driven (translate roadmap into architecture) or ongoing (evaluate system health, update architecture, cut next sprint from existing backlog).
 ---
 
 # Skill: Solution Architect — Technical Strategy
@@ -19,7 +19,7 @@ You think out loud — showing your reasoning, presenting alternatives, and usin
 |:------|:---------|:--------|
 | Roadmap | `roadmap.yaml` (`paths.roadmap` in config, optional) | Feature roadmap (from Strategist). Triggers roadmap mode when present. |
 | Components | `COMPONENTS.yaml` (`paths.components` in config) | Current component registry |
-| Architecture Docs | `paths.architecture_docs` in config (globs) | Per-module ARCHITECTURE.md, ADRs, design docs |
+| ADRs | `docs/adrs/*.md` | Architecture Decision Records |
 | Master Backlog | `master_backlog.yaml` (`paths.master_backlog` in config) | Existing backlog to update (roadmap mode) or primary input (ongoing mode) |
 | Config | `.workflow/config.yaml` | Project paths and settings |
 
@@ -57,7 +57,7 @@ If neither file exists, HALT: suggest running `/wf-command-strategist` to create
    - *Roadmap mode:* Read `roadmap.yaml` (`paths.roadmap` in config) to understand what needs to be built.
    - *Ongoing mode:* Read `master_backlog.yaml` (`paths.master_backlog` in config) to understand what is planned, in progress, and completed. This is your primary input.
 3. Read `COMPONENTS.yaml` (`paths.components` in config) to understand the current system structure.
-4. Expand every glob in `paths.architecture_docs` and read the matching files. These include per-module `ARCHITECTURE.md` files, ADRs, design documents, and any other registered architectural knowledge. If the set is large (>20 files), read titles/headers first and prioritize docs relevant to the components being touched.
+4. Read ADRs from `docs/adrs/*.md` and any other design documents. If the set is large (>20 files), read titles/headers first and prioritize docs relevant to the components being touched.
 5. Read `master_backlog.yaml` (`paths.master_backlog` in config) if it exists and was not already read in step 2 — check what is already planned or in progress.
 
 If `COMPONENTS.yaml` does not exist, you are working on a new project. Create it from scratch based on the roadmap (or backlog) and any existing source structure.
@@ -198,14 +198,8 @@ Based on the design decisions agreed in Phase 3:
 - Update `constraints` if growth requires it (explain why)
 - Add or update `dependency_rules`
 
-**Update/Create `ARCHITECTURE.md` files:**
-For each affected module:
-- Update Responsibility section if scope changed
-- Update Owns / Does NOT Own if boundaries shifted
-- Update Key Interfaces if new interfaces were added
-- Update Invariants if constraints changed
-
-If a new component is created, generate a new `ARCHITECTURE.md` from the template.
+**Update `COMPONENTS.yaml` summaries:**
+Add or update the `summary` field for each affected component to reflect the design decisions made in Phase 3. The summary should be 2-3 sentences covering responsibility, key interfaces, and ownership boundaries.
 
 #### 4b — Build Master Backlog with Sprint Cut Visualization
 
@@ -282,7 +276,6 @@ Explain the ordering rationale: why these sprint boundaries, what the dependency
 2. Ask for final write approval.
 3. On approval, write:
    - Updated `COMPONENTS.yaml` (`paths.components` in config)
-   - Updated/new `ARCHITECTURE.md` files
    - `master_backlog.yaml` (`paths.master_backlog` in config)
 
 ---
@@ -292,7 +285,6 @@ Explain the ordering rationale: why these sprint boundaries, what the dependency
 | Artifact | Location | Description |
 |:---------|:---------|:------------|
 | Component Registry | `COMPONENTS.yaml` (`paths.components` in config) | Updated component definitions and dependency rules |
-| Architecture Docs | `*/ARCHITECTURE.md` (per module) | Updated per-module architecture documentation |
 | Master Backlog | `master_backlog.yaml` (`paths.master_backlog` in config) | Ordered technical backlog with sprint groupings |
 
 ---

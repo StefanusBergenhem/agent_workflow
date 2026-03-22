@@ -30,6 +30,7 @@ Sub-agent receives:
 - Files listed in `context_to_load` from the task contract
 - Memory file at `paths.memory`
 - `COMPONENTS.yaml` (for design issue detection)
+- External skills config from `config.external_skills` (if configured)
 
 ### Review Phase (per-task, in worktree)
 Model: `config.yaml → models.review` (default: `sonnet`)
@@ -42,7 +43,7 @@ Sub-agent receives:
 - Memory file at `paths.memory`
 - Conventions file(s) at `paths.conventions`
 - `COMPONENTS.yaml` (for architecture compliance)
-- Relevant `ARCHITECTURE.md` file(s) for the task's component
+- External skills config from `config.external_skills` (if configured)
 
 ### Retrospective Phase
 Model: `config.yaml → models.retrospective` (default: `sonnet`)

@@ -34,7 +34,7 @@ For existing codebases, use deep mode:
 ```
 /wf-command-init deep
 ```
-This additionally generates `COMPONENTS.yaml` with discovered modules, per-module `ARCHITECTURE.md` files, and an `architecture_audit.md` report.
+This additionally generates `COMPONENTS.yaml` with discovered modules (including `summary` fields) and an `architecture_audit.md` report.
 
 For repos already using the workflow that need updating after a toolkit change:
 ```
@@ -53,7 +53,7 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
 | Role | Command | Input | Output |
 |:-----|:--------|:------|:-------|
 | **Product Strategist** | `/wf-command-strategist` | Conversation, `roadmap.yaml` | `roadmap.yaml` |
-| **Solution Architect** | `/wf-command-sa` | `roadmap.yaml` (optional), `master_backlog.yaml`, `COMPONENTS.yaml`, `ARCHITECTURE.md` | `master_backlog.yaml`, `COMPONENTS.yaml`, `ARCHITECTURE.md` |
+| **Solution Architect** | `/wf-command-sa` | `roadmap.yaml` (optional), `master_backlog.yaml`, `COMPONENTS.yaml` | `master_backlog.yaml`, `COMPONENTS.yaml` (with summaries) |
 | **Software Architect** | `/wf-command-swa` | `master_backlog.yaml`, source code | `sprint.yaml` (with task contracts) |
 | **Developer** | (automated) | `sprint.yaml` task contracts | Code + `review_ready.yaml` |
 | **Reviewer** | (automated) | Code diff, task contract | APPROVED / REJECTED / DESIGN_ISSUE |
@@ -63,7 +63,7 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
 
 ```
 /wf-command-strategist  →  roadmap.yaml
-/wf-command-sa          →  master_backlog.yaml + COMPONENTS.yaml + ARCHITECTURE.md
+/wf-command-sa          →  master_backlog.yaml + COMPONENTS.yaml (with summaries)
 /wf-command-swa         →  sprint.yaml (with task contracts)
 ```
 
@@ -103,7 +103,7 @@ flowchart TD
         STRAT -->|"roadmap.yaml"| SA
 
         SA["/wf-command-sa\n<i>Solution Architect</i>\n\n5 phases: Ground → Diagnose →\nDesign → Plan → Commit"]
-        SA -->|"master_backlog.yaml\nCOMPONENTS.yaml\nARCHITECTURE.md"| SWA
+        SA -->|"master_backlog.yaml\nCOMPONENTS.yaml\n(with summaries)"| SWA
 
         SWA["/wf-command-swa\n<i>Software Architect</i>\n\nReads source code, consults\ndocs/MEMORY.yaml, sizes tasks"]
         SWA -->|"sprint.yaml\n(with task contracts)"| PIPELINE
@@ -165,9 +165,8 @@ flowchart TD
         H2["suppression-scan\n<i>no @ts-ignore, nolint…</i>"]
         H3["import-direction\n<i>COMPONENTS.yaml rules</i>"]
         H4["tdd-evidence\n<i>red-phase verification</i>"]
-        H5["component-size ⚠️\n<i>max files/symbols</i>"]
-        H6["arch-staleness ⚠️\n<i>ARCHITECTURE.md current?</i>"]
-        H7["retry-loop-detector\n<i>same cmd 3× → block</i>"]
+        H5["coverage-check\n<i>coverage metrics</i>"]
+        H6["retry-loop-detector\n<i>same cmd 3× → block</i>"]
     end
     hooks -.->|"Block (exit 2)\nor warn"| BUILD
 
@@ -194,7 +193,7 @@ flowchart TD
     class STRAT,SA,SWA manualNode
     class PIPELINE,BRANCH,TOPO,PLAN_WT,BUILD,REVIEW,MERGE,DONE,RETRO,LEARN,PUBLISH autoNode
     class HALT_DI,HALT_ESC,HALT_MC haltNode
-    class H1,H2,H3,H4,H5,H6,H7 hookNode
+    class H1,H2,H3,H4,H5,H6 hookNode
     class X1,X2,X3,X4,X5,X6 xcutNode
     class IDLE idleNode
 ```
@@ -284,7 +283,7 @@ The SA thinks out loud — showing reasoning, presenting alternatives with trade
 
 Diagrams are ephemeral conversation tools — they help you see the system during the session but are not persisted into files. Agents consume the YAML artifacts.
 
-**Output:** `master_backlog.yaml`, updated `COMPONENTS.yaml`, updated `ARCHITECTURE.md` files.
+**Output:** `master_backlog.yaml`, updated `COMPONENTS.yaml` (with `summary` fields per component).
 
 ### /wf-command-swa — Software Architecture
 
@@ -335,7 +334,7 @@ Diagrams are ephemeral conversation tools — they help you see the system durin
 | P2 (quality) | Documentation, conventions, clean code |
 | P3 (integration) | Independent preflight run |
 
-**Architecture compliance (new):** Verifies modified files belong to the correct component per `COMPONENTS.yaml`, checks import directions against `dependency_rules`, validates ownership per `ARCHITECTURE.md`.
+**Architecture compliance:** Verifies modified files belong to the correct component per `COMPONENTS.yaml`, checks import directions against `dependency_rules`, validates component summaries.
 
 **On approval:** Pushes the branch, merges to the sprint branch, cleans up the worktree.
 
@@ -367,9 +366,7 @@ dependency_rules:
   - "no circular dependencies"
 ```
 
-### ARCHITECTURE.md (per module)
-
-Each component can have an `ARCHITECTURE.md` documenting its responsibility, ownership boundaries, key interfaces, and invariants.
+`COMPONENTS.yaml` now includes a `summary` field per component (2-3 sentences covering responsibility and key interfaces), replacing per-module ARCHITECTURE.md files.
 
 ### design_issues.yaml
 
@@ -390,6 +387,24 @@ Design issues require resolution via `/wf-command-sa` or `/wf-command-swa`.
 
 ---
 
+## External Skills
+
+The workflow supports **external skill plugins** configured in `.workflow/config.yaml` under `external_skills`. These are project-specific skill files that the build and review skills load for domain-specific guidance.
+
+Five plugin slots are available:
+
+| Slot | Loaded by | Purpose |
+|:-----|:----------|:--------|
+| `implementation` | Build | Language/framework-specific coding guidance |
+| `testing` | Build | Testing strategy, framework conventions, coverage rules |
+| `review` | Review | Project-specific review criteria and quality gates |
+| `frontend` | Build, Review | Frontend architecture patterns and component rules |
+| `backend` | Build, Review | Backend architecture patterns and API conventions |
+
+Each slot points to a SKILL.md file path (relative to project root). If a slot is not configured, it is simply skipped. This allows projects to inject domain knowledge without modifying the core workflow skills.
+
+---
+
 ## Hooks — Mechanical Enforcement
 
 Hooks run automatically during Claude's work. You don't invoke them — they fire on tool use events.
@@ -399,10 +414,11 @@ Hooks run automatically during Claude's work. You don't invoke them — they fir
 | `post-build-scope-audit.sh` | Every Edit/Write | Files modified outside `files_to_touch` | Yes (exit 2) |
 | `post-build-suppression-scan.sh` | Every Edit/Write | `nolint`, `eslint-disable`, `@ts-ignore`, etc. | Yes (exit 2) |
 | `import-direction-check.sh` | Every Edit/Write | Import statements violating `COMPONENTS.yaml` dependency_rules | Yes (exit 2) |
-| `component-size-check.sh` | Every Edit/Write | Components exceeding max_source_files or max_exported_symbols | No (warning only) |
-| `architecture-staleness-check.sh` | Every Edit/Write | Source changes without ARCHITECTURE.md update | No (warning only) |
+| `post-build-coverage-check.sh` | Every Edit/Write | Coverage metrics validation | Yes (exit 2) |
 | `post-build-tdd-evidence.sh` | Manual check | Missing or fake TDD red-phase evidence | Yes (exit 2) |
 | `retry-loop-detector.sh` | Every Bash command | Same command run 3+ times consecutively | Yes (exit 2) |
+
+**Note:** All hooks are pipeline-only — they only fire when `.workflow/pipeline_state.yaml` or `.workflow/current_task.yaml` exists.
 
 ### Disabling hooks temporarily
 
@@ -433,7 +449,6 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 |:-----|:-----------|:--------|:--------|
 | `roadmap.yaml` | `/wf-command-strategist` | SA | Product roadmap with epics and features |
 | `COMPONENTS.yaml` | `/wf-command-sa` (or `/wf-command-init deep`) | SwA, Build, Review, Hooks | Component registry and dependency rules |
-| `*/ARCHITECTURE.md` | `/wf-command-sa` (or `/wf-command-init deep`) | SwA, Review | Per-module architecture docs |
 | `master_backlog.yaml` | `/wf-command-sa` | SwA | Ordered backlog with sprint groupings |
 | `sprint.yaml` | `/wf-command-swa` | Pipeline | Sprint with full inline task contracts |
 | `design_issues.yaml` | Build, Review, SwA | Human, SA, SwA | Design-level problems requiring architect resolution |

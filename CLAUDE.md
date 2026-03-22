@@ -36,8 +36,7 @@ hooks/               # Mechanical enforcement (shell scripts)
   post-build-scope-audit.sh   # File boundary enforcement (blocking)
   post-build-suppression-scan.sh  # Lint suppression detection (blocking)
   import-direction-check.sh   # Dependency rule enforcement (blocking)
-  component-size-check.sh     # Component size warnings (non-blocking)
-  architecture-staleness-check.sh  # ARCHITECTURE.md staleness warnings (non-blocking)
+  post-build-coverage-check.sh # Coverage metrics validation (blocking)
   post-build-tdd-evidence.sh  # TDD evidence verification
   retry-loop-detector.sh      # Retry loop detection (blocking)
 
@@ -46,7 +45,6 @@ templates/           # Project bootstrapping templates
   task-contract.yaml.tmpl      # Task contract skeleton
   project-claude.md.tmpl       # Project CLAUDE.md starter
   components.yaml.tmpl         # COMPONENTS.yaml starter
-  architecture.md.tmpl         # Per-module ARCHITECTURE.md starter
   master-backlog.yaml.tmpl     # master_backlog.yaml starter
   design-issues.yaml.tmpl      # design_issues.yaml starter
   sprint.yaml.tmpl             # sprint.yaml starter
@@ -72,7 +70,7 @@ workflow/            # Legacy DEMS workflow docs (kept for reference)
 ```
 Manual (you decide when):
   /wf-command-strategist  →  roadmap.yaml
-  /wf-command-sa          →  master_backlog.yaml + COMPONENTS.yaml + ARCHITECTURE.md
+  /wf-command-sa          →  master_backlog.yaml + COMPONENTS.yaml (with summaries)
   /wf-command-swa         →  sprint.yaml (with task contracts)
 
 Automated (runs autonomously via /wf-command-pipeline):
@@ -91,22 +89,20 @@ When creating or modifying skills, consult these two docs:
 
 - **Skills** are SKILL.md files — pure markdown instructions that define a cognitive mode
 - **State files** use YAML (`.workflow/current_task.yaml`, `review_ready.yaml`, `feedback.yaml`, `pipeline_state.yaml`, `metrics/sprint-<id>.yaml`, `metrics/trends.yaml`)
-- **Architecture files** are committed to git: `COMPONENTS.yaml`, `*/ARCHITECTURE.md`, `master_backlog.yaml`, `sprint.yaml`, `roadmap.yaml`
-- **Hook scripts** must exit 2 to block Claude (not exit 1 — that's non-blocking in Claude Code)
+- **Architecture files** are committed to git: `COMPONENTS.yaml` (with `summary` fields), `master_backlog.yaml`, `sprint.yaml`, `roadmap.yaml`
+- **Hook scripts** must exit 2 to block Claude (not exit 1 — that's non-blocking in Claude Code). Hooks are pipeline-only — they only fire when `.workflow/pipeline_state.yaml` or `.workflow/current_task.yaml` exists
 - **Hook input** arrives as JSON on stdin (not environment variables)
 - **Schema consistency** matters: the build skill's `review_ready.yaml` uses `tdd_evidence.red_phase.ran: true` — hooks parse this exact structure
 - **Commands** have YAML frontmatter with a `description` field, then markdown body
 - **Design issues** are written to `design_issues.yaml` when build/review encounter architectural problems that can't be fixed at the code level
 - **Retrospectives** are generated automatically at pipeline end in `retrospective/<sprint-id>.md`, then archived to `retrospective/archive/` after lessons are extracted
 - **Memory file** (`docs/MEMORY.yaml`) stores structured lessons extracted from retrospectives — consumed by build, review, and SWA skills
+- **External skills** are configured in `config.yaml` under `external_skills` with `defaults` (applied to all tasks) and `domains` (matched by file path globs against `files_to_touch`). Skills are merged: defaults + matching domains = union. Build and review skills load the resolved set
 
 ## Architecture Governance
 
-- `COMPONENTS.yaml` — component registry with boundaries, constraints, and dependency rules
-- `*/ARCHITECTURE.md` — per-module responsibility, ownership, interfaces, invariants
+- `COMPONENTS.yaml` — component registry with boundaries, constraints, and dependency rules. `COMPONENTS.yaml` includes a `summary` field per component (2-3 sentences covering responsibility and key interfaces), replacing per-module ARCHITECTURE.md files
 - `dependency_rules` in `COMPONENTS.yaml` are enforced by the `import-direction-check.sh` hook
-- Component size constraints are monitored by the `component-size-check.sh` hook
-- Architecture staleness is flagged by the `architecture-staleness-check.sh` hook
 - The review skill checks architecture compliance as a P0 check
 
 ## Testing Changes

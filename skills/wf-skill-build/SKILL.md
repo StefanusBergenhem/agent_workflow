@@ -41,6 +41,24 @@ You are the Lead Developer. You execute the contract in `.workflow/current_task.
 
 ---
 
+## Step 1b — Load External Skills
+
+Read `external_skills` from `config.yaml`. Resolve the effective skill list for this task:
+
+1. Start with `external_skills.defaults` — collect all non-empty lists per slot (`implementation`, `testing`, `review`).
+2. Check `external_skills.domains` — for each domain, match its `match` globs against this task's `files_to_touch`. If any file matches, **append** that domain's skills to the defaults (do not replace).
+3. If files match multiple domains, append skills from all matching domains.
+4. Load each resolved skill. Follow their conventions for code structure, patterns, test structure, and idioms.
+
+**Example:** A task touching `backend/handlers/user.go` matches domain `backend`. Effective skills:
+- `implementation`: `["tdd", "golang-patterns"]` (default + backend domain)
+- `testing`: `["golang-testing"]` (backend domain only)
+- `review`: `["requesting-code-review"]` (default only)
+
+External skills provide guidance and best practices. They do **not** override the workflow's core rules (TDD cycle, scope boundaries, suppression ban, retry discipline). If an external skill's recommendation conflicts with a workflow rule, the workflow rule wins.
+
+---
+
 ## Step 2 — Efficiency Rules (Always Active)
 
 These rules apply in BOTH Build Mode and Fix Mode, at all times:
@@ -91,8 +109,9 @@ If tests pass before implementation exists, something is wrong — you are eithe
 
 ### Green Phase
 1. Write the implementation to make all tests pass.
-2. Run tests after each meaningful change.
-3. Fix failures iteratively, with these constraints:
+2. **Run unit tests explicitly.** If `commands.test_unit` is configured in `config.yaml`, run it (pipe output to `/tmp/test-unit.log 2>&1`). All unit tests must pass. This runs in addition to individual test runs — it catches regressions in other unit tests caused by the new code.
+3. Run tests after each meaningful change.
+4. Fix failures iteratively, with these constraints:
    - **Max 3 attempts per failure.**
    - **Each attempt must try a different approach** — do not retry the same fix.
    - **On the 2nd consecutive failure:** Before attempt 3, apply root-cause tracing:
@@ -109,8 +128,8 @@ During implementation, if you encounter a situation where the failure is NOT in 
 **Design issue criteria:**
 - A file you need to import from belongs to a component that `dependency_rules` in `COMPONENTS.yaml` forbids
 - The task requires modifying a file not in `files_to_touch` and the file belongs to a different component
-- An interface declared in the task contract or `ARCHITECTURE.md` doesn't actually exist in the source code
-- An invariant in `ARCHITECTURE.md` conflicts with what the acceptance criteria require
+- An interface declared in the task contract doesn't actually exist in the source code
+- A component's `summary` or `owns` declarations in `COMPONENTS.yaml` conflict with the acceptance criteria
 - A shared type change would cascade beyond the files in scope and cannot be contained
 
 **When you detect a design issue:**
@@ -155,6 +174,41 @@ After all tests pass:
 - Integration tests: real dependencies, appropriately tagged/separated.
 - Happy-path-only = INCOMPLETE. You must implement every case from `testing_mandate`.
 - Each test must be meaningful: it would fail if the implementation were deleted or the logic were inverted.
+
+### Coverage Metric Gate
+
+After all unit tests pass, if `commands.coverage` is configured in `config.yaml`:
+
+1. Run `commands.coverage` (pipe output to `/tmp/coverage.log 2>&1`). Read the log.
+2. Parse the coverage output for files listed in `files_to_touch`.
+3. If `coverage.enforce_on_new_files` is true (default) and any **new** file in `files_to_touch` has line coverage below `coverage.threshold` (default: 90%), HALT and report which files are under-covered with the actual percentages.
+4. Record the actual coverage percentages in `review_ready.yaml` under `coverage_metrics` (see schema below). Do NOT use narrative descriptions — use numbers.
+
+If `commands.coverage` is not configured, skip this gate but note it in `review_ready.yaml`: `coverage_metrics: { tool: "not_configured" }`.
+
+### Integration Test Execution
+
+If `testing_mandate.integration` is non-empty:
+
+1. Verify integration test files were created in `files_to_touch`.
+2. If `commands.test_integration` is configured in `config.yaml`:
+   - Run `commands.test_integration` (pipe output to `/tmp/test-integration.log 2>&1`). Read the log.
+   - If tests pass: record results in `review_ready.yaml`.
+   - If tests fail: apply the same retry discipline as unit tests (max 3 attempts, different approach each time, root-cause tracing on 2nd failure).
+   - If `commands.test_integration` is not configured: record in `review_ready.yaml`: `integration_tests: { status: "not_configured", files_created: [...] }`. Do NOT halt — file existence is sufficient when no runner is configured.
+3. If `testing_mandate.integration` is non-empty but no integration test file exists in `files_to_touch`, HALT and report.
+
+### E2E Test Execution
+
+If `testing_mandate.e2e` is non-empty:
+
+1. Verify e2e test files were created in `files_to_touch`.
+2. If `commands.test_e2e` is configured in `config.yaml`:
+   - Run `commands.test_e2e` (pipe output to `/tmp/test-e2e.log 2>&1`). Read the log.
+   - If tests pass: record results in `review_ready.yaml`.
+   - If tests fail: apply retry discipline.
+   - If `commands.test_e2e` is not configured: record in `review_ready.yaml`: `e2e_tests: { status: "not_configured", files_created: [...] }`.
+3. If `testing_mandate.e2e` is non-empty but no e2e test file exists in `files_to_touch`, HALT and report.
 
 ---
 
@@ -229,14 +283,36 @@ preflight:
     # Paste last 10 lines of the most relevant /tmp/*.log
     All checks passed.
 
-coverage_claim:
-  # For each test file written or modified, list the branches covered
-  - file: "src/module/feature.test.ts"
-    branches:
-      - "happy path: valid input returns expected output"
-      - "null input: returns error, does not throw"
-      - "invalid type: returns validation error"
-      - "empty list: returns empty result, not null"
+coverage_metrics:
+  tool: "jest --coverage"           # or "not_configured" if commands.coverage is missing
+  threshold: 90                     # From coverage.threshold in config
+  files:
+    - file: "src/module/feature.ts"
+      line_coverage: 92.3
+      branch_coverage: 85.7
+      status: "pass"                # "pass" if >= threshold, "fail" if below
+    - file: "src/module/handler.ts"
+      line_coverage: 78.1
+      branch_coverage: 70.0
+      status: "fail"
+
+test_files_created:
+  unit:
+    - "src/module/feature.test.ts"
+  integration:
+    - "src/module/feature.integration.test.ts"
+  e2e: []
+
+integration_tests:
+  status: "pass"              # "pass" | "fail" | "not_configured"
+  command: "npm run test:integration"
+  log_tail: "<last 20 lines from /tmp/test-integration.log>"
+  files_created:
+    - "src/module/feature.integration.test.ts"
+
+e2e_tests:
+  status: "not_configured"    # "pass" | "fail" | "not_configured"
+  files_created: []
 
 doc_updates_applied:
   - "docs/API.md"

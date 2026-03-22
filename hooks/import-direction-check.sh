@@ -6,6 +6,11 @@
 
 set -euo pipefail
 
+# ---- Guard: pipeline-only — skip during manual/exploratory work ----
+if [ ! -f ".workflow/pipeline_state.yaml" ] && [ ! -f ".workflow/current_task.yaml" ]; then
+    exit 0
+fi
+
 COMPONENTS_FILE="COMPONENTS.yaml"
 
 # ---- Guard: only run if COMPONENTS.yaml exists ----

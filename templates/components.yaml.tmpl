@@ -7,6 +7,7 @@ components:
   #
   # auth:
   #   path: src/auth/
+  #   summary: "JWT-based auth with refresh token rotation. Middleware validates on every request. OAuth2 for Google/GitHub."
   #   owns: [authentication, session-management, jwt-validation]
   #   exposes: [AuthMiddleware, SessionStore]
   #   depends_on: [database, user-service]

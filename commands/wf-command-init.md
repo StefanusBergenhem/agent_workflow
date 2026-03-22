@@ -8,7 +8,7 @@ Initialize the workflow system for the current project.
 ## Mode Detection
 
 - **`/wf-command-init`** — Standard init for a new or simple project
-- **`/wf-command-init deep`** — Deep architectural analysis for existing codebases (generates `COMPONENTS.yaml`, per-module `ARCHITECTURE.md`, and architecture audit)
+- **`/wf-command-init deep`** — Deep architectural analysis for existing codebases (generates `COMPONENTS.yaml` with component summaries and architecture audit)
 - **`/wf-command-init migrate`** — Non-destructive migration for repos already using the workflow. Scans existing structure, reports gaps, and applies targeted upgrades.
 
 ---
@@ -52,7 +52,6 @@ paths:
   state: "docs/STATE.md"
   memory: "docs/MEMORY.yaml"
   architecture_docs:
-    - "**/ARCHITECTURE.md"
     - "docs/adrs/*.md"
   conventions: "docs/CONVENTIONS.md"
   components: "COMPONENTS.yaml"
@@ -67,7 +66,13 @@ commands:
   type_check: <detected>           # e.g., "tsc --noEmit"
   compile_check: <detected>        # e.g., "go build ./..."
   preflight: <detected or "">      # combined pre-commit check
+  coverage: <detected or "">       # e.g., "npx jest --coverage", "pytest --cov"
+  db_validate: ""                  # e.g., "npx prisma migrate status", "alembic check"
   context_map: ""                  # command to generate dependency map
+
+coverage:
+  threshold: 90                    # Min line coverage % for new files
+  enforce_on_new_files: true
 
 review:
   max_attempts: 3
@@ -105,6 +110,24 @@ observability:
   trends:
     enabled: true
     max_sprints: 20
+
+external_skills:
+  defaults:
+    implementation: []
+    testing: []
+    review: []
+  domains: {}
+    # Example for a Go + React project:
+    # backend:
+    #   match: ["backend/**", "**/*.go", "cmd/**", "internal/**"]
+    #   skills:
+    #     implementation: ["golang-patterns"]
+    #     testing: ["golang-testing"]
+    # frontend:
+    #   match: ["frontend/**", "**/*.tsx", "**/*.ts"]
+    #   skills:
+    #     implementation: ["frontend-patterns"]
+    #     testing: ["vitest"]
 ```
 
 ### 4. Initialize pipeline state
@@ -140,13 +163,56 @@ If `CLAUDE.md` already exists, do NOT overwrite it. Report that it exists and su
 ### 8. Create .claude/skills/ directory
 Create `.claude/skills/` for per-project skill overrides. Project-level skills take precedence over global skills.
 
-### 9. Report
+### 9. External Skills Domain Detection
+
+Based on the language and framework detection from Step 2, pre-populate `external_skills.domains` with sensible defaults. Check which skills are installed in `~/.claude/skills/` and only reference skills that actually exist.
+
+**Multi-language projects** (e.g., both `go.mod` and `package.json` detected): Create separate domain entries for each language, using directory structure to infer path patterns. Scan the project tree for language-specific directories (e.g., `cmd/`, `internal/`, `pkg/` for Go; `src/`, `frontend/`, `app/` for TypeScript/React).
+
+**Single-language projects:** Create one domain entry. The `defaults` section may be sufficient — note this to the user.
+
+**Suggest installed skills:** For each detected domain, check `~/.claude/skills/` for matching skills and suggest them. Example output:
+```
+Detected: go, typescript (react + vite)
+
+Installed skills that match your stack:
+  Go:         golang-patterns, golang-testing
+  TypeScript: frontend-patterns, vitest
+  General:    tdd, requesting-code-review
+
+Suggested external_skills config added to .workflow/config.yaml.
+Review and adjust match patterns for your directory structure.
+```
+
+### 10. CI Alignment Check
+
+After generating the config, check for common gaps and warn the user:
+
+- **If `commands.test_integration` is empty:** Warn: "No integration test command configured. If your project has integration tests, set `commands.test_integration` in config. Without it, the pipeline cannot enforce integration test execution."
+- **If `commands.coverage` is empty:** Warn: "No coverage command configured. Without it, the pipeline cannot enforce code coverage thresholds. Set `commands.coverage` (e.g., `npx jest --coverage`)."
+- **If `commands.db_validate` is empty and the project uses a database** (detected via Prisma, SQLAlchemy, TypeORM, GORM, etc.): Warn: "Database detected but `commands.db_validate` is not configured. Set it to catch stale migrations (e.g., `npx prisma migrate status`)."
+
+Explain the Docker/host split:
+```
+Note: The automated pipeline (/wf-command-pipeline) runs unit tests and lint
+inside its environment. Integration tests, e2e tests, and DB validation
+require infrastructure that may not be available during pipeline execution.
+
+After the pipeline completes, run /wf-command-ship on the host to:
+  1. Run the full test suite (unit + integration + e2e)
+  2. Verify code coverage meets thresholds
+  3. Validate database state
+  4. Push the sprint branch to GitHub
+```
+
+### 11. Report
 Print a summary of what was created and detected. Suggest next steps:
 - Review and customize `.workflow/config.yaml`
 - Run `/wf-command-strategist` to create a product roadmap
 - Run `/wf-command-sa` to define components and master backlog
 - Run `/wf-command-swa` to detail the first sprint
 - Run `/wf-command-pipeline` to execute the sprint
+- Run `/wf-command-ship` on the host to validate and push
 
 ---
 
@@ -171,13 +237,12 @@ Based on agent findings, produce initial `COMPONENTS.yaml`:
 - `exposes` derived from exported symbols
 - `constraints` set to defaults (max 20 files, max 15 exports) — flag if already exceeded
 
-### Step D3 — Generate per-module `ARCHITECTURE.md` files
+### Step D3 — Enhance `COMPONENTS.yaml` with summary fields
 
-For each component, create an `ARCHITECTURE.md` in the component's directory with:
-- Responsibility summary (from Agent 2)
-- Owns / Does NOT Own (inferred from imports and responsibility boundaries)
-- Key Interfaces (from exported symbols)
-- Invariants (left as TODOs for human to fill — agent can't reliably infer these)
+For each detected component, add a `summary` field to its entry in `COMPONENTS.yaml` based on the agent's source code analysis. Each summary should be 2-3 sentences covering:
+- Responsibility (from Agent 2's analysis)
+- Key interfaces (from exported symbols)
+- Ownership boundaries (inferred from imports and responsibility boundaries)
 
 ### Step D4 — Produce Architecture Audit Checklist
 
@@ -212,7 +277,7 @@ This checklist becomes input for the first `/wf-command-sa` session.
 
 - Update `.workflow/config.yaml` with component and audit paths
 - Print summary of findings and suggested next steps:
-  - "Review `COMPONENTS.yaml` — adjust component boundaries as needed"
+  - "Review `COMPONENTS.yaml` — adjust component boundaries and summaries as needed"
   - "Review `architecture_audit.md` — prioritize cleanup items"
   - "Run `/wf-command-sa` to create master backlog addressing audit findings"
 
@@ -276,7 +341,7 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
   - `sprint` (default: `"sprint.yaml"`)
   - `state` (default: `"docs/STATE.md"`)
   - `memory` (default: `"docs/MEMORY.yaml"`)
-  - `architecture_docs` (default: `["**/ARCHITECTURE.md", "docs/adrs/*.md"]`)
+  - `architecture_docs` (default: `["docs/adrs/*.md"]`)
   - `conventions` (default: `"docs/CONVENTIONS.md"`)
   - `components` (default: `"COMPONENTS.yaml"`)
   - `master_backlog` (default: `"master_backlog.yaml"`)
@@ -285,13 +350,12 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
 
 #### Check 4 — Architecture paths
 
-**Why:** The SA skill now reads multiple `ARCHITECTURE.md` files via glob patterns — supporting per-module architecture docs and ADR directories. The old singular `architecture:` path only points to one file, causing the SA to miss distributed architecture documentation.
+**Why:** The SA skill reads architecture documentation via glob patterns in `architecture_docs` — supporting ADR directories and other architecture docs. The old singular `architecture:` path only points to one file, causing the SA to miss distributed architecture documentation.
 
 - **Detect:** Config has `paths.architecture:` (a single string) instead of `paths.architecture_docs:` (a list of globs)
 - **Action:** Replace `architecture: "<path>"` with:
   ```yaml
   architecture_docs:
-    - "**/ARCHITECTURE.md"
     - "docs/adrs/*.md"
   ```
 
@@ -369,6 +433,32 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
 - **Detect:** Neither `docs/MEMORY.md` nor `docs/MEMORY.yaml` exists
 - **Action:** Create `docs/` directory if needed, scaffold `docs/MEMORY.yaml` from `templates/memory.yaml.tmpl`.
 
+#### Check 12 — Deprecated per-module ARCHITECTURE.md files
+
+**Why:** Per-module `ARCHITECTURE.md` files have been replaced by `summary` fields in `COMPONENTS.yaml` entries. Keeping both creates drift — the summary fields are authoritative and consumed by skills, while stale `ARCHITECTURE.md` files mislead contributors.
+
+- **Detect:** Any `**/ARCHITECTURE.md` files exist in the project (excluding `node_modules`, `.git`, and other vendored directories)
+- **Action:** Warn: "Found per-module ARCHITECTURE.md files — these are deprecated. Extract key information (responsibility, interfaces, ownership boundaries) into `summary` fields on corresponding `COMPONENTS.yaml` entries, then delete the ARCHITECTURE.md files." List the files found.
+
+#### Check 13 — Missing or outdated external_skills section
+
+**Why:** The `external_skills` section allows projects to plug in domain-specific skills (implementation patterns, testing strategies, review checklists) that the pipeline injects into build and review phases. Skills are resolved by merging `defaults` (applied to all tasks) with `domains` (matched by file path globs against `files_to_touch`). Without this section, projects cannot leverage external skills.
+
+- **Detect:** No `external_skills:` section in `.workflow/config.yaml`, OR `external_skills` exists but uses the old flat format (has keys like `implementation`, `frontend`, `backend` directly under `external_skills` instead of under `defaults`/`domains`)
+- **Action (missing):** Append:
+  ```yaml
+  external_skills:
+    defaults:
+      implementation: []
+      testing: []
+      review: []
+    domains: {}
+  ```
+- **Action (old flat format):** Migrate by moving existing values into the new structure:
+  - Move `implementation`, `testing`, `review` values into `defaults` (wrap scalar values in lists)
+  - Move `frontend` and `backend` values into `domains` entries with appropriate `match` patterns (infer from project structure)
+  - Report: "Migrated external_skills from flat format to defaults/domains structure. Review the `match` patterns in `domains` to ensure they cover the right files."
+
 ---
 
 ### Step M3 — Report and apply
@@ -393,6 +483,8 @@ Config version: <current> → <target>
   9   Gitignore gaps           OK               All entries present
   10  Stale pipeline state     OK               Phase is idle
   11  Missing MEMORY.yaml      NEEDS_MIGRATION  Scaffold from template
+  12  Deprecated ARCH.md files NEEDS_MIGRATION  Warn about 2 per-module ARCHITECTURE.md files
+  13  Missing external_skills  NEEDS_MIGRATION  Add external_skills section with defaults
 
 Applying migrations...
   ✓ Updated config version to 2
@@ -403,6 +495,8 @@ Applying migrations...
   ✓ Added observability section to config
   ✓ Created .workflow/metrics/, .workflow/archive/metrics/, retrospective/archive/
   ✓ Scaffolded docs/MEMORY.yaml from template
+  ⚠ Found 2 deprecated ARCHITECTURE.md files — extract summaries into COMPONENTS.yaml
+  ✓ Added external_skills section to config
 ```
 
 ---

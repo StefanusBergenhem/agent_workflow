@@ -21,8 +21,7 @@ You are the QA Reviewer. You validate the Developer's work against the Architect
 | Config | `config.yaml` | Project-level settings, paths, commands |
 | Memory | `docs/MEMORY.yaml` (`paths.memory` in config) | Known rule violations, past lessons |
 | Conventions | `docs/CONVENTIONS.md` (`paths.conventions` in config) | Code style and pattern rules |
-| Components | `COMPONENTS.yaml` (`paths.components` in config) | Component registry and dependency rules |
-| Architecture | Relevant `ARCHITECTURE.md` | Ownership declarations for the task's component |
+| Components | `COMPONENTS.yaml` (`paths.components` in config) | Component registry with `summary`, `owns` fields, dependency rules, and ownership validation |
 
 ---
 
@@ -44,10 +43,20 @@ Read in this exact order:
 3. Run `git diff origin/main` — the actual changes (ground truth)
 4. Memory file — check for known rule violations and past mistakes
 5. Conventions file(s) — the coding standards the implementation must follow
-6. `COMPONENTS.yaml` (`paths.components` in config) — component boundaries and dependency rules
-7. Relevant `ARCHITECTURE.md` for the task's component — ownership declarations
+6. `COMPONENTS.yaml` (`paths.components` in config) — component boundaries, dependency rules, `summary` and `owns` fields for ownership validation
 
 **The diff is the source of truth.** If the claim in `review_ready.yaml` contradicts the diff, the diff wins.
+
+### Step 1b — Load External Skills
+
+Read `external_skills` from `config.yaml`. Resolve the effective skill list for this task:
+
+1. Start with `external_skills.defaults` — collect all non-empty lists per slot (`implementation`, `testing`, `review`).
+2. Check `external_skills.domains` — for each domain, match its `match` globs against this task's `files_to_touch`. If any file matches, **append** that domain's skills to the defaults (do not replace).
+3. If files match multiple domains, append skills from all matching domains.
+4. Load each resolved skill. Use their guidance to inform your review checks.
+
+External skills augment the QA checklist — they do **not** replace P0-P3 checks. Any external skill check is additive. Workflow rules (scope boundaries, TDD evidence, suppression ban) always take precedence.
 
 ### Step 2 — QA Checklist
 
@@ -60,7 +69,7 @@ Execute the checklist in priority order. Stop at the first P0 failure — do not
 | 0.1 | **Security scan** | Scan the diff for: SQL injection (string concatenation in queries), XSS (`dangerouslySetInnerHTML`, raw DOM insertion), hardcoded credentials/secrets, auth bypass (endpoints without auth middleware), input validation gaps (missing type/length/enum checks), secret exposure in error messages | REJECT with `security_violation` |
 | 0.2 | **Scope audit** | Compare `git diff --name-only origin/main` against `files_to_touch` in the contract. Every modified file MUST be in the contract's scope. | REJECT with `scope_violation` |
 | 0.3 | **Acceptance criteria** | Re-read each criterion in `acceptance_criteria`. For each one, find the specific code or test in the diff that satisfies it. If any criterion is not demonstrably met, reject. | REJECT with `acceptance_criteria_unmet` |
-| 0.4 | **Architecture compliance** | Check that modified files belong to the correct component per `COMPONENTS.yaml` (`paths.components` in config). Verify the task's component owns the concepts being implemented per `ARCHITECTURE.md`. Check that any new imports respect `dependency_rules`. | REJECT with `architecture_violation` or write design issue |
+| 0.4 | **Architecture compliance** | Check that modified files belong to the correct component per `COMPONENTS.yaml` (`paths.components` in config). Verify the task's component owns the concepts being implemented per the component's `summary` and `owns` fields in `COMPONENTS.yaml`. Check that any new imports respect `dependency_rules`. | REJECT with `architecture_violation` or write design issue |
 
 #### P1 — Test Quality (any failure = REJECT)
 
@@ -70,6 +79,8 @@ Execute the checklist in priority order. Stop at the first P0 failure — do not
 | 1.2 | **Test quality** | Check every test against the anti-pattern list: (a) Asserts behavior, not implementation — refactoring without changing behavior must not break the test (#1). (b) Mocks only external boundaries, not owned code — uses real or in-memory fakes for internal dependencies (#2). (c) Assertions are specific enough to fail if the implementation were deleted or returned a trivial value (#3). (d) No direct access to private/internal methods (#4). (e) No snapshot overuse — targeted assertions unless testing a stable serialization format (#5). (f) Test names describe scenario and expected result — failure message alone tells you what broke (#6). (g) No shared mutable state between tests — each test creates its own state (#7). (h) Input variations use parameterized tests, not copy-pasted blocks (#9). | REJECT with `test_quality` |
 | 1.3 | **TDD evidence** | `tdd_evidence` in `review_ready.yaml` shows a red phase with real failure messages that correspond to the test cases. If the red phase is missing, vague, or fake, reject. | REJECT with `tdd_missing` |
 | 1.4 | **Suppression scan** | Scan the diff for suppression directives: `@ts-ignore`, `// nolint`, `# type: ignore`, `eslint-disable`, `noqa`, `@SuppressWarnings`, or any equivalent. | REJECT with `convention_violation` |
+| 1.5 | **Coverage verification** | If `commands.coverage` is configured: run it independently (pipe to `/tmp/review-coverage.log 2>&1`). Parse output for files in `files_to_touch`. Verify every new file meets `coverage.threshold` (default 90%). Do NOT trust the builder's `coverage_metrics` — run independently. If `coverage_metrics.tool` is `"not_configured"` in `review_ready.yaml` but `commands.coverage` IS configured in `config.yaml`, reject — the builder skipped coverage. | REJECT with `coverage_insufficient` |
+| 1.6 | **Integration/E2E test execution** | For each non-empty entry in `testing_mandate`: (a) Verify corresponding test file exists in diff. (b) If `commands.test_integration` / `commands.test_e2e` is configured, run tests independently (pipe to `/tmp/review-integration.log 2>&1` / `/tmp/review-e2e.log 2>&1`). Do NOT trust the builder's claims — run independently. (c) If not configured, verify file existence and lint-cleanliness only. Cross-reference results against `review_ready.yaml` claims. | REJECT with `test_missing` or `integration_test_fail` or `e2e_test_fail` |
 
 #### P2 — Lint & Code Quality (any failure = REJECT)
 
@@ -101,9 +112,9 @@ The architecture compliance check (P0.4) is expanded here:
    - Check `dependency_rules` in `COMPONENTS.yaml`
    - If the import violates a dependency rule, this is an architecture violation
 
-3. **Ownership claim check:** Check `ARCHITECTURE.md` for the task's component:
-   - Verify the concepts being implemented are in the "Owns" section
-   - If the task implements something in the "Does NOT Own" section, flag it
+3. **Ownership claim check:** Check the component's `summary` and `owns` fields in `COMPONENTS.yaml`:
+   - Verify the concepts being implemented are listed in the component's `owns` array
+   - If the task implements something outside the component's `owns` scope, flag it
 
 4. **If architecture violation is design-level** (wrong boundary, not just wrong code):
    - Write to `design_issues.yaml` (`paths.design_issues` in config) instead of rejecting:
@@ -133,7 +144,7 @@ Execute the approval workflow:
 
 3. **Update memory (optional).** If the work solved a recurring problem or revealed a lesson worth preserving, add a structured entry to `docs/MEMORY.yaml` (`paths.memory` in config). Use the YAML format with `id`, `category`, `rule`, `evidence`, and `confidence` fields. The continuous-learning skill will consolidate and deduplicate at sprint end — partial or rough entries are fine here.
 
-4. **Update architecture docs.** If the work established a new architectural pattern or constraint, add a one-sentence entry to the ADR/architecture doc explaining the decision and its rationale.
+4. **Update memory for architecture signals.** If the work established a new architectural pattern or constraint worth recording, add a lesson to `docs/MEMORY.yaml` (`paths.memory` in config) with category `architecture_signals`.
 
 5. **Clean up workflow files:**
    - Delete `.workflow/current_task.yaml`
@@ -176,7 +187,7 @@ failures:
     #   scope_violation | test_missing | test_quality | tdd_missing |
     #   doc_missing | doc_quality | convention_violation | preflight_fail |
     #   security_violation | clean_code_violation | acceptance_criteria_unmet |
-    #   e2e_missing | architecture_violation | lint_fail
+    #   e2e_missing | architecture_violation | lint_fail | coverage_insufficient
     file: "src/module/feature.test.ts"
     detail: |
       Branch 'null input' is listed in coverage claim but no test case
