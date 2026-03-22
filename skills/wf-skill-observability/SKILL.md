@@ -24,7 +24,7 @@ If `config.observability.enabled` is `false` or the `observability` section is m
 
 ## Metrics Directory
 
-All metrics files live in `.workflow/metrics/` (gitignored with the rest of `.workflow/`).
+All metrics files live in the directory specified by `observability.metrics_dir` in config (default: `.workflow/metrics/`), gitignored with the rest of `.workflow/`.
 
 Create this directory at pipeline start if it doesn't exist.
 
@@ -110,10 +110,12 @@ Increment `cost_estimate.total_dispatches`.
 
 **At Step 3 (Assemble context envelope) — estimate context tokens:**
 
-After assembling the context envelope, estimate the total token count:
+If `config.observability.cost_estimation.enabled` is true (default), estimate the total token count after assembling the context envelope:
 - Sum the byte sizes of all files in the envelope
 - Divide by `config.observability.cost_estimation.token_ratio` (default: 4)
 - Record as a running average in `cost_estimate.estimated_context_tokens.<phase>_avg`
+
+If `cost_estimation.enabled` is false, skip token estimation — leave `cost_estimate` fields at their initial values.
 
 Formula for running average:
 ```
@@ -160,7 +162,7 @@ Before spawning the retrospective sub-agent, finalize the metrics file:
 
 ### 6. Trends Append (Publishing Phase)
 
-After the retrospective completes, before or during the publishing phase, append a summary entry to `.workflow/metrics/trends.yaml`:
+If `config.observability.trends.enabled` is true (default), after the retrospective completes, before or during the publishing phase, append a summary entry to `<metrics_dir>/trends.yaml`:
 
 ```yaml
 sprints:
@@ -183,6 +185,8 @@ sprints:
 If `trends.yaml` doesn't exist, create it with a `sprints: []` list and append.
 
 If `trends.yaml` has more entries than `config.observability.trends.max_sprints` (default: 20), remove the oldest entries to stay within the limit.
+
+If `trends.enabled` is false, skip the trends append entirely.
 
 ---
 

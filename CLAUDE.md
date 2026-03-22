@@ -29,7 +29,8 @@ commands/            # Slash commands (thin wrappers invoking skills)
   wf-command-build.md         # Manual build trigger
   wf-command-review.md        # Manual review trigger
   wf-command-status.md        # Pipeline status report
-  wf-command-init.md          # Project bootstrap (standard + deep mode)
+  wf-command-init.md          # Project bootstrap (standard + deep + migrate mode)
+  wf-command-ship.md          # Host-side validation gate (test suite + push)
 
 hooks/               # Mechanical enforcement (shell scripts)
   hooks.json                   # Hook config (merges into settings.json)
@@ -51,6 +52,8 @@ templates/           # Project bootstrapping templates
   sprint-metrics.yaml.tmpl     # .workflow/metrics/sprint-<id>.yaml schema
   trends.yaml.tmpl             # .workflow/metrics/trends.yaml schema
   memory.yaml.tmpl             # docs/MEMORY.yaml starter (structured lessons)
+  state.md.tmpl                # docs/STATE.md starter (infrastructure facts)
+  conventions.md.tmpl          # docs/CONVENTIONS.md starter (code style and patterns)
 
 docs/                # Authoring guides and workflow documentation
   persuasion-principles.md    # Persuasion psychology for skill design
@@ -118,6 +121,26 @@ When adding or modifying skills, commands, hooks, templates, or config fields, *
 - **`install.sh`** — Does it handle the new/changed artifact? Skills and commands are glob-based (auto-discovered), but hooks must be listed in `hooks/hooks.json` and the summary output should reflect any new artifact categories.
 - **`commands/wf-command-init.md`** — Does the init command's example config, directory scaffolding, and `.gitignore` entries reflect the change? New config sections need to appear in the example block. New directories the pipeline expects must be created during init. New generated output directories should be gitignored.
 - **`templates/workflow-config.yaml.tmpl`** — Is the canonical config template in sync with what init documents?
+
+### Config ↔ Skill Consistency (mandatory on every update)
+
+Every config field in `templates/workflow-config.yaml.tmpl` must be **read by at least one skill, hook, or command**. Every config field referenced by a skill must **exist in the template**. When modifying any skill or the config template:
+
+1. **Forward check:** grep the template for all field names → confirm each is consumed by at least one skill/hook/command. Flag any field with zero consumers as dead — either wire it or remove it.
+2. **Reverse check:** grep all skills for `config.*`, `commands.*`, `paths.*`, `task_sizing.*`, `review.*`, `learning.*`, `observability.*`, `coverage.*`, `models.*`, `parallel.*` references → confirm each referenced field exists in the template with the exact same name (watch for snake_case mismatches).
+3. **No hardcoded defaults that shadow config:** if a skill uses a value that is also in config (e.g., max attempts, sizing limits, directory paths), it must read from config with a fallback default — never hardcode the value and ignore the config field.
+
+### Init Command: Zero-Config Setup Wizard
+
+`commands/wf-command-init.md` must function as a **complete setup wizard**. After running `/wf-command-init` (any mode), the project must be fully ready to run the workflow toolkit with no further manual file creation. This means:
+
+- **Every file referenced by `paths.*` in config** must either be scaffolded by init (from a template) or explicitly detected as already existing. If a skill expects a file at a config path and init doesn't create it, that's a bug.
+- **Every directory the pipeline writes to** (`.workflow/metrics/`, `retrospective/`, `docs/adrs/`, etc.) must be created by init.
+- **All three modes must stay in sync:** standard, deep, and migrate. When a new config section, template, scaffolded file, or directory is added:
+  - Standard mode must scaffold it.
+  - Deep mode must scaffold it (inherits from standard).
+  - Migrate mode must detect its absence and add it.
+- **The init config block must match `templates/workflow-config.yaml.tmpl` exactly** — no fields present in one but missing from the other.
 
 ## Collaboration Posture
 

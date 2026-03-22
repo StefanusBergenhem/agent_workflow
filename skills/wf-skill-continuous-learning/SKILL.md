@@ -33,7 +33,7 @@ You are the Learning Extractor. You run at the end of every retrospective. You r
 3. Read `docs/MEMORY.yaml` (`paths.memory` in config). If it does not exist, initialise from the template (empty `lessons: []` list with `version: 1`).
 4. If `.workflow/metrics/sprint-<sprint-id>.yaml` exists, load it for component health and rejection pattern data.
 5. If `design_issues.yaml` (`paths.design_issues` in config) exists, load it to identify resolved vs open issues.
-6. Read `config.yaml` learning settings (`learning.max_memory_entries`, `learning.archive_retrospectives`, etc.). Use defaults if not configured.
+6. Read `config.yaml` learning settings. **If `learning.enabled` is false, skip all operations and report "Learning disabled in config." then exit.** Otherwise read `learning.max_memory_entries`, `learning.archive_retrospectives`, etc. Use defaults if individual settings are not configured.
 
 ### Step 2 — Extract Lessons
 

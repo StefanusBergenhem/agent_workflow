@@ -38,7 +38,7 @@ stage_summaries:
   # Compact summaries written at stage boundaries (context hygiene).
   # 1: { completed: ["S1.1", "S1.2"], escalated: [], design_issues: [], merged_branches: ["s1.1-add-parser"] }
 
-max_attempts: 3                  # Escalate when attempt_counter >= max_attempts
+max_attempts: 3                  # Read from review.max_attempts in config (default: 3). Escalate when attempt_counter >= max_attempts.
 
 last_transition:
   from: ""

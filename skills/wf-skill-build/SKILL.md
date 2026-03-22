@@ -71,7 +71,7 @@ These rules apply in BOTH Build Mode and Fix Mode, at all times:
 Read the log file after the command completes. This prevents terminal flooding and preserves evidence.
 
 ### Compile Checks
-**Compile-check after every file modification.** After writing or modifying any source file, run the appropriate type-check or compile command (from `commands.typecheck` in config, or the language-appropriate default). Do not wait until the end to discover compilation errors.
+**Compile-check after every file modification.** After writing or modifying any source file, run the appropriate type-check or compile command (from `commands.type_check` in config, or the language-appropriate default). Do not wait until the end to discover compilation errors.
 
 ### Lint Checks
 **Lint after every file modification.** After writing or modifying any source file, run `commands.lint` from config. Lint errors are code errors — fix them immediately, do not defer to preflight. If no `commands.lint` is configured, HALT and report.

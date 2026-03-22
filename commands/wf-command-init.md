@@ -64,11 +64,9 @@ commands:
   test_e2e: ""                     # fill in if applicable
   lint: <detected>
   type_check: <detected>           # e.g., "tsc --noEmit"
-  compile_check: <detected>        # e.g., "go build ./..."
   preflight: <detected or "">      # combined pre-commit check
   coverage: <detected or "">       # e.g., "npx jest --coverage", "pytest --cov"
   db_validate: ""                  # e.g., "npx prisma migrate status", "alembic check"
-  context_map: ""                  # command to generate dependency map
 
 coverage:
   threshold: 90                    # Min line coverage % for new files
@@ -81,7 +79,6 @@ review:
 parallel:
   enabled: true
   worktree_base: ".claude/worktrees"
-  merge_strategy: "branch-push"
   max_concurrent_tasks: 4
 
 models:
@@ -145,11 +142,14 @@ Append the following to `.gitignore` if not already present (workflow state and 
 - `.workflow/`
 - `retrospective/`
 
-### 6. Scaffold architecture and learning files
+### 6. Scaffold architecture, learning, and project files
 Create empty starter files:
 - `COMPONENTS.yaml` — from `templates/components.yaml.tmpl` (empty component registry)
 - `master_backlog.yaml` — from `templates/master-backlog.yaml.tmpl` (empty backlog)
 - `docs/MEMORY.yaml` — from `templates/memory.yaml.tmpl` (structured lessons store)
+- `docs/STATE.md` — from `templates/state.md.tmpl` (infrastructure facts and known issues)
+- `docs/CONVENTIONS.md` — from `templates/conventions.md.tmpl` (code style and patterns)
+- `docs/adrs/` — create empty directory for Architecture Decision Records
 
 ### 7. Generate starter CLAUDE.md (if none exists)
 If no `CLAUDE.md` exists in the project root, create one with:
@@ -458,6 +458,45 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
   - Move `implementation`, `testing`, `review` values into `defaults` (wrap scalar values in lists)
   - Move `frontend` and `backend` values into `domains` entries with appropriate `match` patterns (infer from project structure)
   - Report: "Migrated external_skills from flat format to defaults/domains structure. Review the `match` patterns in `domains` to ensure they cover the right files."
+
+#### Check 14 — Missing task_sizing section
+
+**Why:** The SWA skill reads `task_sizing.max_files_to_touch`, `task_sizing.max_context_files`, and `task_sizing.max_estimated_lines` from config to enforce sizing limits on task contracts. Without this section, the SWA falls back to hardcoded defaults, but the config doesn't reflect the active limits.
+
+- **Detect:** No `task_sizing:` section in `.workflow/config.yaml`
+- **Action:** Append:
+  ```yaml
+  task_sizing:
+    max_files_to_touch: 3
+    max_context_files: 5
+    max_estimated_lines: 150
+  ```
+
+#### Check 15 — Missing coverage section
+
+**Why:** The build skill reads `coverage.threshold` and `coverage.enforce_on_new_files` from config to enforce code coverage on new files. Without this section, the build skill uses hardcoded defaults but the config doesn't reflect the active thresholds.
+
+- **Detect:** No `coverage:` section in `.workflow/config.yaml`
+- **Action:** Append:
+  ```yaml
+  coverage:
+    threshold: 90
+    enforce_on_new_files: true
+  ```
+
+#### Check 16 — Missing scaffolded files
+
+**Why:** The review skill reads `docs/STATE.md` (`paths.state`) and `docs/CONVENTIONS.md` (`paths.conventions`) during review. The SA skill reads ADRs from `paths.architecture_docs` (default: `docs/adrs/*.md`). If these files/directories don't exist, skills silently skip context that improves review quality.
+
+- **Detect:** Any of these are missing: `docs/STATE.md`, `docs/CONVENTIONS.md`, `docs/adrs/` directory
+- **Action:** Create missing files from templates (`templates/state.md.tmpl`, `templates/conventions.md.tmpl`) and create the `docs/adrs/` directory.
+
+#### Check 17 — Dead config fields from previous versions
+
+**Why:** Fields `commands.compile_check`, `commands.context_map`, and `parallel.merge_strategy` were removed — no skill reads them. Keeping them in config creates false expectations that they have an effect.
+
+- **Detect:** Config contains `compile_check:`, `context_map:`, or `merge_strategy:` fields
+- **Action:** Warn: "Found deprecated config fields that are no longer used by any skill. Consider removing: `commands.compile_check`, `commands.context_map`, `parallel.merge_strategy`." Do NOT auto-remove — the user may have custom tooling that reads these.
 
 ---
 

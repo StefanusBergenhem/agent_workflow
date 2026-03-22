@@ -177,8 +177,8 @@ Write `.workflow/feedback.yaml` with specific, actionable failures.
 # .workflow/feedback.yaml
 status: "rejected"
 step_id: "X.Y.Z"
-attempt: 1                    # Increment on each rejection. Escalate at max_attempts (default: 3).
-max_attempts: 3
+attempt: 1                    # Increment on each rejection. Escalate at review.max_attempts from config (default: 3).
+max_attempts: 3               # Read from review.max_attempts in config (default: 3).
 timestamp: "YYYY-MM-DDTHH:MM:SS"
 
 failures:
@@ -207,9 +207,9 @@ failures:
    - `detail`: What is wrong, with evidence from the diff
    - `required_action`: Exactly what the Developer must do to fix it
 
-3. **Increment attempt counter.** Each rejection increments `attempt`. Check `max_attempts` (default: 3).
+3. **Increment attempt counter.** Each rejection increments `attempt`. Read `max_attempts` from `review.max_attempts` in config (default: 3).
 
-4. **Escalate at max_attempts.** If `attempt` would exceed `max_attempts`, do NOT write feedback. Instead, HALT and escalate to the human with a summary of all prior failures and the pattern of repeated issues. The task may need to be re-planned.
+4. **Escalate at max_attempts.** If `attempt` would exceed `max_attempts`, do NOT write feedback. Instead, follow the `review.escalation` strategy from config (default: `halt`). HALT and escalate to the human with a summary of all prior failures and the pattern of repeated issues. The task may need to be re-planned.
 
 5. **Group related failures.** If multiple issues stem from the same root cause, list them as separate failures but note the connection in the detail.
 

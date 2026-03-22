@@ -28,7 +28,11 @@ This creates:
 - `.workflow/pipeline_state.yaml` — pipeline state tracker
 - `COMPONENTS.yaml` — empty component registry
 - `master_backlog.yaml` — empty backlog
-- `.workflow/` added to `.gitignore`
+- `docs/MEMORY.yaml` — structured lessons store
+- `docs/STATE.md` — infrastructure facts and known issues
+- `docs/CONVENTIONS.md` — code style and patterns
+- `docs/adrs/` — directory for Architecture Decision Records
+- `.workflow/` and `retrospective/` added to `.gitignore`
 
 For existing codebases, use deep mode:
 ```
@@ -292,7 +296,7 @@ Diagrams are ephemeral conversation tools — they help you see the system durin
 **You decide when to run this.** After SA, or when ready to start the next sprint.
 
 **What to look for:**
-- Are tasks sized correctly? (max 3 files, max 150 lines each)
+- Are tasks sized correctly? (per `task_sizing` in config — default: max 3 files, max 150 lines each)
 - Are acceptance criteria clear and testable?
 - Are component boundaries respected?
 - Are there design issues flagged?
@@ -391,17 +395,20 @@ Design issues require resolution via `/wf-command-sa` or `/wf-command-swa`.
 
 The workflow supports **external skill plugins** configured in `.workflow/config.yaml` under `external_skills`. These are project-specific skill files that the build and review skills load for domain-specific guidance.
 
-Five plugin slots are available:
+Skills are organized into two layers:
+
+- **`defaults`** — applied to ALL tasks regardless of domain (e.g., TDD, code review)
+- **`domains`** — matched by file path globs against `files_to_touch` (e.g., Go backend, React frontend)
+
+Three skill slots are available per layer:
 
 | Slot | Loaded by | Purpose |
 |:-----|:----------|:--------|
 | `implementation` | Build | Language/framework-specific coding guidance |
 | `testing` | Build | Testing strategy, framework conventions, coverage rules |
 | `review` | Review | Project-specific review criteria and quality gates |
-| `frontend` | Build, Review | Frontend architecture patterns and component rules |
-| `backend` | Build, Review | Backend architecture patterns and API conventions |
 
-Each slot points to a SKILL.md file path (relative to project root). If a slot is not configured, it is simply skipped. This allows projects to inject domain knowledge without modifying the core workflow skills.
+Skills are merged: defaults + all matching domain skills = union. Each slot references installed skill names (from `~/.claude/skills/`). If a slot is empty, it is simply skipped. This allows projects to inject domain knowledge without modifying the core workflow skills.
 
 ---
 

@@ -231,7 +231,8 @@ When all stages are complete (or all remaining tasks are blocked/escalated):
 3. Spawn the retrospective sub-agent with its context envelope (includes metrics files — see [DISPATCH.md](DISPATCH.md)).
 4. The retrospective skill produces `retrospective/<sprint-id>.md`.
 5. **Append trends:** If `config.observability.enabled`, append a summary entry to `.workflow/metrics/trends.yaml`. Trim to `config.observability.trends.max_sprints` entries if exceeded. See `skills/wf-skill-observability/SKILL.md § Trends Append` for the schema.
-6. On completion, transition to `publishing`. See [GIT_OPERATIONS.md](GIT_OPERATIONS.md) for the publishing protocol.
+6. **Continuous learning:** If `config.learning.enabled` is true (default), invoke the continuous-learning skill to extract lessons, enforce memory capacity, and archive retrospective documents. If `learning.enabled` is false, skip this step.
+7. On completion, transition to `publishing`. See [GIT_OPERATIONS.md](GIT_OPERATIONS.md) for the publishing protocol.
 
 ---
 
@@ -240,7 +241,7 @@ When all stages are complete (or all remaining tasks are blocked/escalated):
 ### Automatic Gates
 
 1. **Build → Review.** When build completes with `review_ready.yaml`, proceed to review.
-2. **Review → Build (rejection).** When review produces `feedback.yaml`, increment `attempt_counter` and re-enter build in Fix Mode. Max 3 attempts, then escalate.
+2. **Review → Build (rejection).** When review produces `feedback.yaml`, increment `attempt_counter` and re-enter build in Fix Mode. Escalate when `attempt_counter >= max_attempts` (read from `review.max_attempts` in config, default: 3).
 3. **Review → Merge (approval).** When review approves, execute merge protocol.
 4. **Stage Complete → Next Stage.** When all tasks resolved, proceed to next stage.
 5. **All Stages Complete → Retrospective.** Automatic, no human gate.

@@ -26,11 +26,9 @@ commands:
   test_e2e: "{{TEST_E2E_CMD}}"
   lint: "{{LINT_CMD}}"
   type_check: "{{TYPE_CHECK_CMD}}"
-  compile_check: "{{COMPILE_CHECK_CMD}}"
   preflight: "{{PREFLIGHT_CMD}}"
   coverage: "{{COVERAGE_CMD}}"            # e.g., "npx jest --coverage", "go test -coverprofile=coverage.out ./...", "pytest --cov"
   db_validate: "{{DB_VALIDATE_CMD}}"      # e.g., "npx prisma migrate status", "alembic check"
-  context_map: "{{CONTEXT_MAP_CMD}}"
 
 coverage:
   threshold: 90                            # Minimum line coverage % for new files
@@ -43,7 +41,6 @@ review:
 parallel:
   enabled: true
   worktree_base: ".claude/worktrees"
-  merge_strategy: "branch-push"    # or "direct-merge"
   max_concurrent_tasks: 4
 
 models:

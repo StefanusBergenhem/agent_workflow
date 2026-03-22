@@ -57,7 +57,7 @@ If neither file exists, HALT: suggest running `/wf-command-strategist` to create
    - *Roadmap mode:* Read `roadmap.yaml` (`paths.roadmap` in config) to understand what needs to be built.
    - *Ongoing mode:* Read `master_backlog.yaml` (`paths.master_backlog` in config) to understand what is planned, in progress, and completed. This is your primary input.
 3. Read `COMPONENTS.yaml` (`paths.components` in config) to understand the current system structure.
-4. Read ADRs from `docs/adrs/*.md` and any other design documents. If the set is large (>20 files), read titles/headers first and prioritize docs relevant to the components being touched.
+4. Read ADRs from `paths.architecture_docs` in config (default: `["docs/adrs/*.md"]`) and any other design documents. If the set is large (>20 files), read titles/headers first and prioritize docs relevant to the components being touched.
 5. Read `master_backlog.yaml` (`paths.master_backlog` in config) if it exists and was not already read in step 2 — check what is already planned or in progress.
 
 If `COMPONENTS.yaml` does not exist, you are working on a new project. Create it from scratch based on the roadmap (or backlog) and any existing source structure.

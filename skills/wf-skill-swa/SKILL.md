@@ -40,10 +40,10 @@ For each backlog item in the sprint:
 
 2. **Validate the SA's assumptions.** Does the backlog item's `rough_scope` match reality? Are the interfaces the SA assumed actually there? Are there hidden complexities?
 
-3. **Identify files to touch.** Based on the actual code structure, determine exactly which files need to be created or modified. Apply the sizing rules:
-   - Max 3 files per task
-   - Max 150 lines of net new code per task
-   - Max 5 context files per task
+3. **Identify files to touch.** Based on the actual code structure, determine exactly which files need to be created or modified. Apply the sizing rules from `task_sizing` in config (defaults shown):
+   - Max `task_sizing.max_files_to_touch` files per task (default: 3)
+   - Max `task_sizing.max_estimated_lines` lines of net new code per task (default: 150)
+   - Max `task_sizing.max_context_files` context files per task (default: 5)
 
 4. **Split if necessary.** If a backlog item exceeds sizing limits, split it into sub-tasks (e.g., `S1.1.1`, `S1.1.2`). Each sub-task must be independently completable and verifiable.
 
@@ -234,9 +234,9 @@ On approval:
 ## Hard Constraints
 
 - **Read the source.** You MUST read actual source code before writing contracts. Never rely solely on `COMPONENTS.yaml` summaries — verify against reality.
-- **Max 3 files per task.** Split if exceeded. No exceptions.
-- **Max 150 lines per task.** Split if exceeded.
-- **Max 5 context files per task.** Split if exceeded.
+- **Max `task_sizing.max_files_to_touch` files per task** (default: 3). Split if exceeded. No exceptions.
+- **Max `task_sizing.max_estimated_lines` lines per task** (default: 150). Split if exceeded.
+- **Max `task_sizing.max_context_files` context files per task** (default: 5). Split if exceeded.
 - **Component boundaries are law.** Every file in `files_to_touch` must belong to the task's declared component. Cross-component work = separate tasks.
 - **Flag, don't fix.** If `COMPONENTS.yaml` declarations are wrong, write a design issue. Do not silently update them — that's the SA's job.
 - **Human approval required.** Never write sprint.yaml without explicit human approval.
