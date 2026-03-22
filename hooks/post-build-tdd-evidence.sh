@@ -6,8 +6,10 @@
 
 set -euo pipefail
 
-# ---- Guard: pipeline-only — skip during manual/exploratory work ----
-if [ ! -f ".workflow/pipeline_state.yaml" ] && [ ! -f ".workflow/current_task.yaml" ]; then
+# ---- Guard: pipeline-only — skip unless there is an active task ----
+# current_task.yaml is the authoritative signal that a build is in progress.
+# pipeline_state.yaml alone is not enough (it persists across sprints).
+if [ ! -f ".workflow/current_task.yaml" ]; then
     exit 0
 fi
 
