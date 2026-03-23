@@ -89,19 +89,12 @@ Read the log file after the command completes. This prevents terminal flooding a
 
 ## Step 3 — TDD Workflow (Red -> Green -> Refactor)
 
+**Announce each TDD phase as you begin it:** "Entering Red Phase", "Entering Green Phase", "Entering Refactor Phase". This tracks your progress and prevents skipping phases.
+
 ### Red Phase
 1. Create or modify the test file(s) listed in `files_to_touch`.
 2. Implement every test case from `testing_mandate` in the contract.
-3. **Before running tests, verify each test against the anti-pattern checklist:**
-   - Asserts observable behavior, not internal method calls or implementation details (#1)
-   - Uses real or in-memory fake implementations for code you own; mocks only at external boundaries (#2)
-   - Has assertions specific enough to fail if the implementation were deleted or returned a trivial value (#3)
-   - Tests through public interfaces only — no `_private` method access (#4)
-   - Uses targeted assertions, not snapshot matching (unless testing a genuinely stable serialization format) (#5)
-   - Test name follows `test_<action>_<scenario>_<expected_result>` — failure message alone tells you what broke (#6)
-   - Each test creates its own state — no shared mutable variables across tests (#7)
-   - Covers error paths, boundary conditions, and edge cases — not just the happy path (#8)
-   - Uses parameterized tests for input variations instead of copy-pasting test blocks (#9)
+3. **Before running tests, verify each test against the anti-pattern checklist.** Read [skills/wf-skill-testing-anti-patterns/SKILL.md](../wf-skill-testing-anti-patterns/SKILL.md) and check every test against the Quick Reference table (anti-patterns #1 through #9). Any match means the test needs restructuring before proceeding.
 4. Run the tests and **confirm they FAIL** — the implementation does not exist yet.
 5. **Record the failure output.** Save the key failure lines. This is TDD evidence that the Reviewer will verify.
 
@@ -173,7 +166,7 @@ After all tests pass:
 - Unit tests: no external dependencies (DB, network, filesystem). Use interface stubs or mocks.
 - Integration tests: real dependencies, appropriately tagged/separated.
 - Happy-path-only = INCOMPLETE. You must implement every case from `testing_mandate`.
-- Each test must be meaningful: it would fail if the implementation were deleted or the logic were inverted.
+- Each test must pass the anti-pattern checklist (see Step 3, item 3).
 
 ### Coverage Metric Gate
 
@@ -227,7 +220,7 @@ Before running the final preflight, apply this 6-point verification checklist:
 
 1. **Tests are fresh.** Re-run all tests (not from cache) — confirm 0 failures with current output.
 2. **No stale state.** No leftover debug prints, no commented-out code, no TODO comments.
-3. **Assertions are meaningful.** Each test would fail if the implementation were deleted.
+3. **Assertions are meaningful.** Re-verify against the anti-pattern checklist (Step 3, item 3) — especially anti-pattern #3 (weak assertions).
 4. **Scope is clean.** Only files in `files_to_touch` were modified (check with `git diff --name-only`).
 5. **Acceptance criteria met.** Re-read each criterion from the contract and confirm the implementation satisfies it.
 6. **Documentation complete.** All entries in `doc_updates_required` have been updated.

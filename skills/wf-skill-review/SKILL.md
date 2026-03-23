@@ -47,6 +47,8 @@ Read in this exact order:
 
 **The diff is the source of truth.** If the claim in `review_ready.yaml` contradicts the diff, the diff wins.
 
+**Working directory:** All commands in this review (coverage, tests, lint, preflight) MUST be run from the worktree path provided in the context envelope, not the main repository root. Running commands from the wrong directory means you are testing the wrong code.
+
 ### Step 1b — Load External Skills
 
 Read `external_skills` from `config.yaml`. Resolve the effective skill list for this task:
@@ -75,8 +77,8 @@ Execute the checklist in priority order. Stop at the first P0 failure — do not
 
 | # | Check | What to verify | Fail Action |
 |:--|:------|:---------------|:------------|
-| 1.1 | **Test existence** | Every case from `testing_mandate` in the contract has a corresponding test in the diff. Error paths, boundary conditions, and edge cases are covered — not just the happy path (#8). | REJECT with `test_missing` |
-| 1.2 | **Test quality** | Check every test against the anti-pattern list: (a) Asserts behavior, not implementation — refactoring without changing behavior must not break the test (#1). (b) Mocks only external boundaries, not owned code — uses real or in-memory fakes for internal dependencies (#2). (c) Assertions are specific enough to fail if the implementation were deleted or returned a trivial value (#3). (d) No direct access to private/internal methods (#4). (e) No snapshot overuse — targeted assertions unless testing a stable serialization format (#5). (f) Test names describe scenario and expected result — failure message alone tells you what broke (#6). (g) No shared mutable state between tests — each test creates its own state (#7). (h) Input variations use parameterized tests, not copy-pasted blocks (#9). | REJECT with `test_quality` |
+| 1.1 | **Test existence** | Every case from `testing_mandate` in the contract has a corresponding test in the diff. Error paths, boundary conditions, and edge cases are covered — not just the happy path (see anti-pattern #8 in the testing anti-patterns skill). | REJECT with `test_missing` |
+| 1.2 | **Test quality** | Read [skills/wf-skill-testing-anti-patterns/SKILL.md](../wf-skill-testing-anti-patterns/SKILL.md). Check every test against the Quick Reference table — all 9 anti-patterns (#1 through #9). Any match is grounds for rejection with a specific citation of which anti-pattern was violated and why. | REJECT with `test_quality` |
 | 1.3 | **TDD evidence** | `tdd_evidence` in `review_ready.yaml` shows a red phase with real failure messages that correspond to the test cases. If the red phase is missing, vague, or fake, reject. | REJECT with `tdd_missing` |
 | 1.4 | **Suppression scan** | Scan the diff for suppression directives: `@ts-ignore`, `// nolint`, `# type: ignore`, `eslint-disable`, `noqa`, `@SuppressWarnings`, or any equivalent. | REJECT with `convention_violation` |
 | 1.5 | **Coverage verification** | If `commands.coverage` is configured: run it independently (pipe to `/tmp/review-coverage.log 2>&1`). Parse output for files in `files_to_touch`. Verify every new file meets `coverage.threshold` (default 90%). Do NOT trust the builder's `coverage_metrics` — run independently. If `coverage_metrics.tool` is `"not_configured"` in `review_ready.yaml` but `commands.coverage` IS configured in `config.yaml`, reject — the builder skipped coverage. | REJECT with `coverage_insufficient` |

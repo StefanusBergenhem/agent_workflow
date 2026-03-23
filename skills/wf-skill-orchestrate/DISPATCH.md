@@ -24,6 +24,7 @@ For every state transition that requires a sub-agent:
 Model: `config.yaml → models.build` (default: `sonnet`)
 Sub-agent receives:
 - `skills/wf-skill-build/SKILL.md`
+- `skills/wf-skill-testing-anti-patterns/SKILL.md` (cross-cutting test quality rules)
 - `config.yaml`
 - `<worktree_path>/.workflow/current_task.yaml`
 - `<worktree_path>/.workflow/feedback.yaml` (if exists — Fix Mode)
@@ -36,6 +37,7 @@ Sub-agent receives:
 Model: `config.yaml → models.review` (default: `sonnet`)
 Sub-agent receives:
 - `skills/wf-skill-review/SKILL.md`
+- `skills/wf-skill-testing-anti-patterns/SKILL.md` (cross-cutting test quality rules)
 - `config.yaml`
 - `<worktree_path>/.workflow/current_task.yaml`
 - `<worktree_path>/.workflow/review_ready.yaml`
