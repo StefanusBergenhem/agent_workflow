@@ -38,96 +38,22 @@ Scan the project root for:
 Record detected language and framework in config.
 
 ### 3. Generate .workflow/config.yaml
-Use `templates/workflow-config.yaml.tmpl` as the source. Substitute template variables with detected values:
-```yaml
-version: 2
+Read `templates/workflow-config.yaml.tmpl` as the canonical source of truth for config structure. Substitute template variables (`{{VAR}}`) with detected values from Step 2:
 
-project:
-  name: <detected from directory name or manifest>
-  language: <detected>
+| Template Variable | Detection Source |
+|---|---|
+| `{{PROJECT_NAME}}` | Directory name or manifest (package.json `name`, go.mod module) |
+| `{{LANGUAGE}}` | Detected language from Step 2 |
+| `{{TEST_UNIT_CMD}}` | Detected test runner (e.g., `go test ./...`, `npm test`) |
+| `{{TEST_INTEGRATION_CMD}}` | `""` (user fills in) |
+| `{{TEST_E2E_CMD}}` | `""` (user fills in) |
+| `{{LINT_CMD}}` | Detected linter (e.g., `golangci-lint run`, `npx eslint .`) |
+| `{{TYPE_CHECK_CMD}}` | Detected type checker (e.g., `tsc --noEmit`) |
+| `{{PREFLIGHT_CMD}}` | Detected or `""` |
+| `{{COVERAGE_CMD}}` | Detected or `""` |
+| `{{DB_VALIDATE_CMD}}` | `""` (user fills in) |
 
-paths:
-  roadmap: "roadmap.yaml"
-  sprint: "sprint.yaml"
-  state: "docs/STATE.md"
-  memory: "docs/MEMORY.yaml"
-  architecture_docs:
-    - "docs/adrs/*.md"
-  conventions: "docs/CONVENTIONS.md"
-  components: "COMPONENTS.yaml"
-  master_backlog: "master_backlog.yaml"
-  design_issues: "design_issues.yaml"
-
-commands:
-  test_unit: <detected>            # e.g., "go test ./...", "npm test", "cargo test"
-  test_integration: ""             # fill in if applicable
-  test_e2e: ""                     # fill in if applicable
-  lint: <detected>
-  type_check: <detected>           # e.g., "tsc --noEmit"
-  preflight: <detected or "">      # combined pre-commit check
-  coverage: <detected or "">       # e.g., "npx jest --coverage", "pytest --cov"
-  db_validate: ""                  # e.g., "npx prisma migrate status", "alembic check"
-
-coverage:
-  threshold: 90                    # Min line coverage % for new/modified files
-  enforce_on_new_files: true
-  enforce_on_modified_files: true
-  integration_test_ratio: "per_external_dep"
-
-review:
-  max_attempts: 3
-  escalation: halt
-
-parallel:
-  enabled: true
-  worktree_base: ".claude/worktrees"
-  max_concurrent_tasks: 4
-
-models:
-  build: "sonnet"
-  review: "sonnet"
-  retrospective: "sonnet"
-
-task_sizing:
-  max_files_to_touch: 3
-  max_context_files: 5
-  max_estimated_lines: 150
-
-learning:
-  enabled: true
-  max_memory_entries: 30
-  archive_retrospectives: true
-  archive_metrics: true
-  cleanup_design_issues: true
-
-observability:
-  enabled: true
-  metrics_dir: ".workflow/metrics"
-  cost_estimation:
-    enabled: true
-    token_ratio: 4
-  trends:
-    enabled: true
-    max_sprints: 20
-
-external_skills:
-  defaults:
-    implementation: []
-    testing: []
-    review: []
-  domains: {}
-    # Example for a Go + React project:
-    # backend:
-    #   match: ["backend/**", "**/*.go", "cmd/**", "internal/**"]
-    #   skills:
-    #     implementation: ["golang-patterns"]
-    #     testing: ["golang-testing"]
-    # frontend:
-    #   match: ["frontend/**", "**/*.tsx", "**/*.ts"]
-    #   skills:
-    #     implementation: ["frontend-patterns"]
-    #     testing: ["vitest"]
-```
+Write the substituted result to `.workflow/config.yaml`. The template defines ALL sections (paths, commands, coverage, review, parallel, models, task_sizing, learning, observability, external_skills) — do not add or omit any.
 
 ### 4. Initialize pipeline state
 Write `.workflow/pipeline_state.yaml`:
@@ -184,6 +110,7 @@ Installed skills that match your stack:
 
 Suggested external_skills config added to .workflow/config.yaml.
 Review and adjust match patterns for your directory structure.
+Tip: Add 'commands:' to each domain for domain-specific test/lint commands.
 ```
 
 ### 10. CI Alignment Check
@@ -367,46 +294,21 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
 **Why:** The pipeline dispatches sub-agents with model overrides. Without this section, all sub-agents inherit the orchestrator's model (typically opus), wasting tokens on mechanical build/review tasks that sonnet handles equally well.
 
 - **Detect:** No `models:` section in `.workflow/config.yaml`
-- **Action:** Append:
-  ```yaml
-  models:
-    build: "sonnet"
-    review: "sonnet"
-    retrospective: "sonnet"
-  ```
+- **Action:** Read the `models:` section from `templates/workflow-config.yaml.tmpl` and append it to the config.
 
 #### Check 6 — Learning section
 
 **Why:** Continuous learning extracts lessons from retrospectives, enforces a capacity limit on the memory file, and archives processed retrospectives and metrics. Without this section, lessons accumulate unbounded, old retrospectives consume context in future runs, and the memory file grows past its useful size.
 
 - **Detect:** No `learning:` section in `.workflow/config.yaml`
-- **Action:** Append:
-  ```yaml
-  learning:
-    enabled: true
-    max_memory_entries: 30
-    archive_retrospectives: true
-    archive_metrics: true
-    cleanup_design_issues: true
-  ```
+- **Action:** Read the `learning:` section from `templates/workflow-config.yaml.tmpl` and append it to the config.
 
 #### Check 7 — Observability section
 
 **Why:** The pipeline collects structured timing, cost, and task metrics at every phase boundary. The retrospective consumes these metrics for quantitative analysis (first-attempt pass rates, component health, cost trends). Without this section, retrospectives are qualitative-only and cross-sprint trends can't be tracked.
 
 - **Detect:** No `observability:` section in `.workflow/config.yaml`
-- **Action:** Append:
-  ```yaml
-  observability:
-    enabled: true
-    metrics_dir: ".workflow/metrics"
-    cost_estimation:
-      enabled: true
-      token_ratio: 4
-    trends:
-      enabled: true
-      max_sprints: 20
-  ```
+- **Action:** Read the `observability:` section from `templates/workflow-config.yaml.tmpl` and append it to the config.
 
 #### Check 8 — Missing directories
 
@@ -448,15 +350,7 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
 **Why:** The `external_skills` section allows projects to plug in domain-specific skills (implementation patterns, testing strategies, review checklists) that the pipeline injects into build and review phases. Skills are resolved by merging `defaults` (applied to all tasks) with `domains` (matched by file path globs against `files_to_touch`). Without this section, projects cannot leverage external skills.
 
 - **Detect:** No `external_skills:` section in `.workflow/config.yaml`, OR `external_skills` exists but uses the old flat format (has keys like `implementation`, `frontend`, `backend` directly under `external_skills` instead of under `defaults`/`domains`)
-- **Action (missing):** Append:
-  ```yaml
-  external_skills:
-    defaults:
-      implementation: []
-      testing: []
-      review: []
-    domains: {}
-  ```
+- **Action (missing):** Read the `external_skills:` section from `templates/workflow-config.yaml.tmpl` and append it to the config.
 - **Action (old flat format):** Migrate by moving existing values into the new structure:
   - Move `implementation`, `testing`, `review` values into `defaults` (wrap scalar values in lists)
   - Move `frontend` and `backend` values into `domains` entries with appropriate `match` patterns (infer from project structure)
@@ -467,27 +361,14 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
 **Why:** The SWA skill reads `task_sizing.max_files_to_touch`, `task_sizing.max_context_files`, and `task_sizing.max_estimated_lines` from config to enforce sizing limits on task contracts. Without this section, the SWA falls back to hardcoded defaults, but the config doesn't reflect the active limits.
 
 - **Detect:** No `task_sizing:` section in `.workflow/config.yaml`
-- **Action:** Append:
-  ```yaml
-  task_sizing:
-    max_files_to_touch: 3
-    max_context_files: 5
-    max_estimated_lines: 150
-  ```
+- **Action:** Read the `task_sizing:` section from `templates/workflow-config.yaml.tmpl` and append it to the config.
 
 #### Check 15 — Missing or incomplete coverage section
 
 **Why:** The build and review skills read `coverage.threshold`, `coverage.enforce_on_new_files`, `coverage.enforce_on_modified_files`, and `coverage.integration_test_ratio` from config to enforce code coverage. Without this section or with missing fields, skills use hardcoded defaults but the config doesn't reflect the active thresholds.
 
 - **Detect:** No `coverage:` section in `.workflow/config.yaml`, or section exists but is missing `enforce_on_modified_files` or `integration_test_ratio`
-- **Action:** If section missing, append full block. If section exists but incomplete, add missing fields with defaults:
-  ```yaml
-  coverage:
-    threshold: 90
-    enforce_on_new_files: true
-    enforce_on_modified_files: true
-    integration_test_ratio: "per_external_dep"
-  ```
+- **Action:** If section missing, read the `coverage:` section from `templates/workflow-config.yaml.tmpl` and append it to the config. If section exists but incomplete, add the missing fields using the template's default values.
 
 #### Check 16 — Missing scaffolded files
 
@@ -502,6 +383,26 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
 
 - **Detect:** Config contains `compile_check:`, `context_map:`, or `merge_strategy:` fields
 - **Action:** Warn: "Found deprecated config fields that are no longer used by any skill. Consider removing: `commands.compile_check`, `commands.context_map`, `parallel.merge_strategy`." Do NOT auto-remove — the user may have custom tooling that reads these.
+
+#### Check 18 — Unknown config fields
+
+**Why:** Fields not present in the template schema are not consumed by any workflow skill. They may be typos, remnants of custom experiments, or fields from a deprecated version. Silently ignoring them creates false expectations that they have an effect. Check 17 catches 3 specific known-deprecated fields; this check catches everything else.
+
+- **Detect:** Parse all dot-separated field paths in `.workflow/config.yaml` (e.g., `commands.test_unit`, `coverage.threshold`, `observability.cost_estimation.token_ratio`). Parse all dot-separated field paths in `templates/workflow-config.yaml.tmpl` (ignoring `{{VAR}}` placeholders — treat them as valid leaf values). Compute the set difference: user config paths minus template paths. **Exclude** any path starting with `external_skills.domains.` — these are user-defined domain entries with user-chosen names and structures. If the difference set is non-empty, report.
+- **Action:** Warn with the full list of unknown fields:
+  ```
+  Found N config fields not in the template schema:
+    - commands.test_backend_integration
+    - commands.compile_check
+
+  These fields are not consumed by any workflow skill. They may be:
+    - Typos (check spelling against template fields)
+    - Custom fields for external tooling (safe to keep, but workflow ignores them)
+    - Deprecated fields (see Check 17 for known deprecations)
+
+  Action: Review and remove or rename. No automatic changes applied.
+  ```
+  Do NOT auto-remove. If any unknown fields overlap with Check 17's deprecated list, note that they are already flagged as deprecated.
 
 ---
 
@@ -529,6 +430,11 @@ Config version: <current> → <target>
   11  Missing MEMORY.yaml      NEEDS_MIGRATION  Scaffold from template
   12  Deprecated ARCH.md files NEEDS_MIGRATION  Warn about 2 per-module ARCHITECTURE.md files
   13  Missing external_skills  NEEDS_MIGRATION  Add external_skills section with defaults
+  14  Missing task_sizing      OK               Section present
+  15  Incomplete coverage      OK               All fields present
+  16  Missing scaffolded files OK               All files present
+  17  Dead config fields       OK               No deprecated fields found
+  18  Unknown config fields    NEEDS_MIGRATION  Warn about 2 unknown fields
 
 Applying migrations...
   ✓ Updated config version to 2
@@ -541,6 +447,7 @@ Applying migrations...
   ✓ Scaffolded docs/MEMORY.yaml from template
   ⚠ Found 2 deprecated ARCHITECTURE.md files — extract summaries into COMPONENTS.yaml
   ✓ Added external_skills section to config
+  ⚠ Found 2 unknown config fields — review and remove (see details above)
 ```
 
 ---

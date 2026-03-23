@@ -88,15 +88,24 @@ external_skills:
   domains:
     # Each domain has glob patterns matched against files_to_touch.
     # When a task's files match, domain skills are appended to defaults.
-    # If files span multiple domains, all matching domain skills are loaded.
+    # Domain commands override top-level commands for matched tasks.
+    # If files span multiple domains, all matching domain skills are loaded;
+    # commands use the domain with the most file matches (ties: first alphabetically).
     #
     # backend:
     #   match: ["backend/**", "**/*.go", "cmd/**", "internal/**"]
     #   skills:
     #     implementation: ["golang-patterns"]
     #     testing: ["golang-testing"]
+    #   commands:                          # Optional: override top-level commands
+    #     test_unit: "go test ./..."
+    #     test_integration: "go test -tags=integration ./..."
+    #     lint: "golangci-lint run"
     # frontend:
     #   match: ["frontend/**", "**/*.tsx", "**/*.ts", "src/components/**"]
     #   skills:
     #     implementation: ["frontend-patterns"]
     #     testing: ["vitest"]
+    #   commands:
+    #     test_unit: "npx vitest run"
+    #     lint: "npx eslint ."

@@ -176,6 +176,7 @@ When a stage reaches `stage_complete`:
 2. **Post-merge validation.** After all approved tasks in the stage have merged to the sprint branch, run validation on the merged result:
    - Run `commands.test_unit` (if configured) on the sprint branch. Pipe output to `/tmp/pipeline-postmerge-stage-<N>.log 2>&1`.
    - Run `commands.lint` (if configured) on the sprint branch. Pipe output to `/tmp/pipeline-postmerge-lint-<N>.log 2>&1`.
+   - **Commands used:** top-level `commands` from config (NOT domain-specific overrides). Post-merge validation tests the combined sprint branch across all domains.
    - If either fails: HALT. Report which tests/lint checks broke after merge (these passed in isolation but fail when combined). Escalate to human — this is a cross-task integration issue that cannot be auto-resolved.
    - If both pass: continue.
 3. **Update the stage status** in `pipeline_state.yaml` to `completed`.

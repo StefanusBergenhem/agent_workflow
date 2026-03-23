@@ -62,6 +62,17 @@ Read `external_skills` from `config.yaml`. Resolve the effective skill list for 
 
 External skills augment the QA checklist — they do **not** replace P0-P3 checks. Any external skill check is additive. Workflow rules (scope boundaries, TDD evidence, suppression ban) always take precedence.
 
+### Step 1c — Resolve Domain Commands
+
+Resolve the effective command set for this task using the same algorithm as the build skill (see `wf-skill-build/SKILL.md` Step 1c):
+
+1. Start with top-level `commands` from `config.yaml`.
+2. If any domain matched in Step 1b has a `commands` section, apply the override from the domain with the most file matches.
+3. Ties broken alphabetically by domain name.
+4. If multiple domains have conflicting command overrides, warn.
+
+Use the resolved commands for all command references in this review: lint, coverage, integration/e2e tests, and preflight.
+
 ### Step 2 — QA Checklist
 
 Execute the checklist in priority order. Stop at the first P0 failure — do not continue checking lower priorities if a P0 fails. **Announce each priority level** as you begin it: "Checking P0 — Critical checks", "Checking P1 — Test quality", etc.

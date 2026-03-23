@@ -61,6 +61,22 @@ External skills provide guidance and best practices. They do **not** override th
 
 ---
 
+## Step 1c — Resolve Domain Commands
+
+After resolving external skills (Step 1b), resolve the effective command set for this task:
+
+1. Start with the top-level `commands` from `config.yaml` as the default set.
+2. Using the same domain matches computed in Step 1b (domains whose `match` globs hit files in `files_to_touch`), check if any matching domain has a `commands` section.
+3. **No matching domain has `commands`:** use top-level commands. Done.
+4. **Exactly one matching domain has `commands`:** merge its entries over the top-level defaults. Only keys present in the domain's `commands` are overridden; others keep their top-level values.
+5. **Multiple matching domains have `commands`:** select the domain with the most file matches (count of `files_to_touch` entries matching that domain's globs). Ties broken alphabetically by domain name. Merge that domain's `commands` over defaults. Warn: "Files span multiple domains with command overrides. Using domain '<name>' commands (most file matches)."
+
+Use the resolved command set for ALL subsequent command references in this task: `commands.test_unit`, `commands.lint`, `commands.type_check`, `commands.coverage`, `commands.test_integration`, `commands.test_e2e`, `commands.preflight`.
+
+**Design note:** Skills merge (additive knowledge from all matching domains). Commands override (only one test runner can execute, from the best-matching domain). This asymmetry is intentional.
+
+---
+
 ## Step 2 — Efficiency Rules (Always Active)
 
 These rules apply in BOTH Build Mode and Fix Mode, at all times:

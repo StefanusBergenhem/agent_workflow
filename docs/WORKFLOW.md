@@ -396,6 +396,41 @@ Three skill slots are available per layer:
 
 Skills are merged: defaults + all matching domain skills = union. Each slot references installed skill names (from `~/.claude/skills/`). If a slot is empty, it is simply skipped. This allows projects to inject domain knowledge without modifying the core workflow skills.
 
+### Domain-Specific Commands
+
+For full-stack projects where different domains need different test/lint commands, add `commands:` to domain entries:
+
+```yaml
+external_skills:
+  domains:
+    backend:
+      match: ["backend/**", "**/*.go"]
+      skills:
+        implementation: ["golang-patterns"]
+        testing: ["golang-testing"]
+      commands:
+        test_unit: "go test ./..."
+        test_integration: "go test -tags=integration ./..."
+        lint: "golangci-lint run"
+    frontend:
+      match: ["frontend/**", "**/*.tsx"]
+      skills:
+        implementation: ["frontend-patterns"]
+        testing: ["vitest"]
+      commands:
+        test_unit: "npx vitest run"
+        lint: "npx eslint ."
+```
+
+**How resolution works:**
+- Top-level `commands` are the defaults for all tasks
+- When a task's `files_to_touch` match a domain with `commands`, those commands override the top-level defaults for that task only
+- Only specified keys are overridden — unspecified commands keep their top-level values
+- Skills merge from all matching domains; commands come from the single best-matching domain (most file matches, ties broken alphabetically)
+- The ship command and post-merge validation always use top-level commands (full-project scope)
+
+**When to use:** When your project has distinct toolchains per domain (e.g., Go backend + React frontend). If your project is single-language, top-level commands are sufficient.
+
 ---
 
 ## State Files

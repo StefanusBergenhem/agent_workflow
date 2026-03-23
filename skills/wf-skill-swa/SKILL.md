@@ -127,6 +127,7 @@ For each task (including splits), produce a full contract:
 - `context_to_load` MUST include relevant conventions files
 - `out_of_scope` must explicitly state boundaries the developer might be tempted to cross
 - `implementation_notes` should reference actual code patterns found in the source
+- If the project has `external_skills.domains` with `commands` entries, note in `implementation_notes` which domain the task is expected to match (e.g., "This task matches the 'backend' domain — commands resolve to Go toolchain"). This helps the developer understand which commands will be used.
 
 **Integration test enforcement:**
 - If `files_to_touch` includes files that interact with external dependencies (database, network APIs, filesystem, message queues, caches), `testing_mandate.integration_tests` MUST be non-empty. Scan the source code to detect these interactions — look for DB queries, HTTP clients, file I/O, queue producers/consumers. **Minimum count heuristic:** read `coverage.integration_test_ratio` from config (default: `"per_external_dep"`). When set to `"per_external_dep"`, specify at least one integration test per distinct external system interaction path (e.g., a task that reads from a DB and calls an HTTP API needs at least 2 integration tests).

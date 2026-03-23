@@ -126,7 +126,7 @@ Every config field in `templates/workflow-config.yaml.tmpl` must be **read by at
   - Standard mode must scaffold it.
   - Deep mode must scaffold it (inherits from standard).
   - Migrate mode must detect its absence and add it.
-- **The init config block must match `templates/workflow-config.yaml.tmpl` exactly** — no fields present in one but missing from the other.
+- **Init and migrate do not embed config defaults inline** — they read from `templates/workflow-config.yaml.tmpl` at runtime. When updating the config schema, only the template needs to change. Check 18 in migrate mode validates that user configs contain no unknown fields relative to the template.
 
 ## Collaboration Posture
 
