@@ -32,15 +32,6 @@ commands/            # Slash commands (thin wrappers invoking skills)
   wf-command-init.md          # Project bootstrap (standard + deep + migrate mode)
   wf-command-ship.md          # Host-side validation gate (test suite + push)
 
-hooks/               # Mechanical enforcement (shell scripts)
-  hooks.json                   # Hook config (merges into settings.json)
-  post-build-scope-audit.sh   # File boundary enforcement (blocking)
-  post-build-suppression-scan.sh  # Lint suppression detection (blocking)
-  import-direction-check.sh   # Dependency rule enforcement (blocking)
-  post-build-coverage-check.sh # Coverage metrics validation (blocking)
-  post-build-tdd-evidence.sh  # TDD evidence verification
-  retry-loop-detector.sh      # Retry loop detection (blocking)
-
 templates/           # Project bootstrapping templates
   workflow-config.yaml.tmpl    # .workflow/config.yaml starter
   task-contract.yaml.tmpl      # Task contract skeleton
@@ -93,9 +84,6 @@ When creating or modifying skills, consult these two docs:
 - **Skills** are SKILL.md files — pure markdown instructions that define a cognitive mode
 - **State files** use YAML (`.workflow/current_task.yaml`, `review_ready.yaml`, `feedback.yaml`, `pipeline_state.yaml`, `metrics/sprint-<id>.yaml`, `metrics/trends.yaml`)
 - **Architecture files** are committed to git: `COMPONENTS.yaml` (with `summary` fields), `master_backlog.yaml`, `sprint.yaml`, `roadmap.yaml`
-- **Hook scripts** must exit 2 to block Claude (not exit 1 — that's non-blocking in Claude Code). Hooks are pipeline-only — they only fire when `.workflow/pipeline_state.yaml` or `.workflow/current_task.yaml` exists
-- **Hook input** arrives as JSON on stdin (not environment variables)
-- **Schema consistency** matters: the build skill's `review_ready.yaml` uses `tdd_evidence.red_phase.ran: true` — hooks parse this exact structure
 - **Commands** have YAML frontmatter with a `description` field, then markdown body
 - **Design issues** are written to `design_issues.yaml` when build/review encounter architectural problems that can't be fixed at the code level
 - **Retrospectives** are generated automatically at pipeline end in `retrospective/<sprint-id>.md`, then archived to `retrospective/archive/` after lessons are extracted
@@ -105,28 +93,26 @@ When creating or modifying skills, consult these two docs:
 ## Architecture Governance
 
 - `COMPONENTS.yaml` — component registry with boundaries, constraints, and dependency rules. `COMPONENTS.yaml` includes a `summary` field per component (2-3 sentences covering responsibility and key interfaces), replacing per-module ARCHITECTURE.md files
-- `dependency_rules` in `COMPONENTS.yaml` are enforced by the `import-direction-check.sh` hook
 - The review skill checks architecture compliance as a P0 check
 
 ## Testing Changes
 
-- **Hook scripts**: Test against known-good and known-bad git diffs. Each hook should pass cleanly on compliant changes and exit 2 with a clear message on violations.
 - **Skills**: Dry-run on a real project via `/wf-command-init` then `/wf-command-pipeline`. Verify sub-agents receive only their mandated context.
 - **Install script**: Run `./install.sh` — it's idempotent (safe to re-run).
 
 ## Consistency Checks
 
-When adding or modifying skills, commands, hooks, templates, or config fields, **always verify**:
+When adding or modifying skills, commands, templates, or config fields, **always verify**:
 
-- **`install.sh`** — Does it handle the new/changed artifact? Skills and commands are glob-based (auto-discovered), but hooks must be listed in `hooks/hooks.json` and the summary output should reflect any new artifact categories.
+- **`install.sh`** — Does it handle the new/changed artifact? Skills and commands are glob-based (auto-discovered), and the summary output should reflect any new artifact categories.
 - **`commands/wf-command-init.md`** — Does the init command's example config, directory scaffolding, and `.gitignore` entries reflect the change? New config sections need to appear in the example block. New directories the pipeline expects must be created during init. New generated output directories should be gitignored.
 - **`templates/workflow-config.yaml.tmpl`** — Is the canonical config template in sync with what init documents?
 
 ### Config ↔ Skill Consistency (mandatory on every update)
 
-Every config field in `templates/workflow-config.yaml.tmpl` must be **read by at least one skill, hook, or command**. Every config field referenced by a skill must **exist in the template**. When modifying any skill or the config template:
+Every config field in `templates/workflow-config.yaml.tmpl` must be **read by at least one skill or command**. Every config field referenced by a skill must **exist in the template**. When modifying any skill or the config template:
 
-1. **Forward check:** grep the template for all field names → confirm each is consumed by at least one skill/hook/command. Flag any field with zero consumers as dead — either wire it or remove it.
+1. **Forward check:** grep the template for all field names → confirm each is consumed by at least one skill/command. Flag any field with zero consumers as dead — either wire it or remove it.
 2. **Reverse check:** grep all skills for `config.*`, `commands.*`, `paths.*`, `task_sizing.*`, `review.*`, `learning.*`, `observability.*`, `coverage.*`, `models.*`, `parallel.*` references → confirm each referenced field exists in the template with the exact same name (watch for snake_case mismatches).
 3. **No hardcoded defaults that shadow config:** if a skill uses a value that is also in config (e.g., max attempts, sizing limits, directory paths), it must read from config with a fallback default — never hardcode the value and ignore the config field.
 

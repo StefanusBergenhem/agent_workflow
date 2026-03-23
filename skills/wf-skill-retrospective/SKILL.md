@@ -106,7 +106,7 @@ If sprint metrics were loaded in Step 1b, include these analyses:
 
 Based on the patterns, suggest specific improvements:
 
-1. **Workflow improvements:** Changes to the pipeline, skills, or hooks
+1. **Workflow improvements:** Changes to the pipeline or skills
 2. **Architecture improvements:** Component restructuring, new dependency rules, interface changes
 3. **Task sizing improvements:** Better splitting heuristics, risk assessment calibration
 4. **Contract quality improvements:** Missing context, unclear criteria, testing gaps

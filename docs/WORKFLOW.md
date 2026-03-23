@@ -13,7 +13,7 @@ cd ~/repos/Claude_code_workflow
 ./install.sh
 ```
 
-This symlinks skills and commands into `~/.claude/`, installs hooks into `~/.claude/settings.json`, and appends global rules to `~/.claude/CLAUDE.md`. Safe to re-run.
+This copies skills and commands into `~/.claude/` and appends global rules to `~/.claude/CLAUDE.md`. Safe to re-run.
 
 ### 2. Bootstrap a project
 
@@ -162,18 +162,6 @@ flowchart TD
     %% ── Design issue resolution ────────────────────────
     HALT_DI -.->|"Requires architect\nresolution"| SA
 
-    %% ── Hooks (mechanical enforcement) ─────────────────
-    subgraph hooks ["Hooks (fire on Edit/Write/Bash)"]
-        direction LR
-        H1["scope-audit\n<i>files ⊆ files_to_touch</i>"]
-        H2["suppression-scan\n<i>no @ts-ignore, nolint…</i>"]
-        H3["import-direction\n<i>COMPONENTS.yaml rules</i>"]
-        H4["tdd-evidence\n<i>red-phase verification</i>"]
-        H5["coverage-check\n<i>coverage metrics</i>"]
-        H6["retry-loop-detector\n<i>same cmd 3× → block</i>"]
-    end
-    hooks -.->|"Block (exit 2)\nor warn"| BUILD
-
     %% ── Cross-cutting skills ───────────────────────────
     subgraph xcut ["Cross-cutting Skills (always active)"]
         direction LR
@@ -190,14 +178,12 @@ flowchart TD
     classDef manualNode fill:#4a90d9,stroke:#2c5aa0,color:#fff
     classDef autoNode fill:#2ecc71,stroke:#1a9850,color:#fff
     classDef haltNode fill:#e74c3c,stroke:#c0392b,color:#fff
-    classDef hookNode fill:#f39c12,stroke:#d68910,color:#fff
     classDef xcutNode fill:#9b59b6,stroke:#7d3c98,color:#fff
     classDef idleNode fill:#95a5a6,stroke:#7f8c8d,color:#fff
 
     class STRAT,SA,SWA manualNode
     class PIPELINE,BRANCH,TOPO,PLAN_WT,BUILD,REVIEW,MERGE,DONE,RETRO,LEARN,PUBLISH autoNode
     class HALT_DI,HALT_ESC,HALT_MC haltNode
-    class H1,H2,H3,H4,H5,H6 hookNode
     class X1,X2,X3,X4,X5,X6 xcutNode
     class IDLE idleNode
 ```
@@ -412,27 +398,6 @@ Skills are merged: defaults + all matching domain skills = union. Each slot refe
 
 ---
 
-## Hooks — Mechanical Enforcement
-
-Hooks run automatically during Claude's work. You don't invoke them — they fire on tool use events.
-
-| Hook | Triggers on | What it catches | Blocking? |
-|:-----|:------------|:----------------|:----------|
-| `post-build-scope-audit.sh` | Every Edit/Write | Files modified outside `files_to_touch` | Yes (exit 2) |
-| `post-build-suppression-scan.sh` | Every Edit/Write | `nolint`, `eslint-disable`, `@ts-ignore`, etc. | Yes (exit 2) |
-| `import-direction-check.sh` | Every Edit/Write | Import statements violating `COMPONENTS.yaml` dependency_rules | Yes (exit 2) |
-| `post-build-coverage-check.sh` | Every Edit/Write | Coverage metrics validation | Yes (exit 2) |
-| `post-build-tdd-evidence.sh` | Manual check | Missing or fake TDD red-phase evidence | Yes (exit 2) |
-| `retry-loop-detector.sh` | Every Bash command | Same command run 3+ times consecutively | Yes (exit 2) |
-
-**Note:** All hooks are pipeline-only — they only fire when `.workflow/pipeline_state.yaml` or `.workflow/current_task.yaml` exists.
-
-### Disabling hooks temporarily
-
-If a hook is blocking legitimate work, you can comment it out in `~/.claude/settings.json` under the `hooks` key. Re-enable it after.
-
----
-
 ## State Files
 
 All workflow state lives in `.workflow/` (gitignored). These files drive the pipeline:
@@ -455,7 +420,7 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 | File | Written by | Read by | Purpose |
 |:-----|:-----------|:--------|:--------|
 | `roadmap.yaml` | `/wf-command-strategist` | SA | Product roadmap with epics and features |
-| `COMPONENTS.yaml` | `/wf-command-sa` (or `/wf-command-init deep`) | SwA, Build, Review, Hooks | Component registry and dependency rules |
+| `COMPONENTS.yaml` | `/wf-command-sa` (or `/wf-command-init deep`) | SwA, Build, Review | Component registry and dependency rules |
 | `master_backlog.yaml` | `/wf-command-sa` | SwA | Ordered backlog with sprint groupings |
 | `sprint.yaml` | `/wf-command-swa` | Pipeline | Sprint with full inline task contracts |
 | `design_issues.yaml` | Build, Review, SwA | Human, SA, SwA | Design-level problems requiring architect resolution |
@@ -742,7 +707,7 @@ When the pipeline surfaces a design issue:
 
 ### Upgrading after toolkit update
 
-1. Run `install.sh` to update skills, commands, and hooks
+1. Run `install.sh` to update skills and commands
 2. In each project: `/wf-command-init migrate` to update config and directory structure
 
 ### Resuming after an interruption
@@ -785,12 +750,6 @@ Run `/wf-command-init migrate` — it will detect missing sections and add them 
 
 ### "No config.yaml found"
 Run `/wf-command-init` first to bootstrap the project.
-
-### Hook keeps blocking edits
-Check which hook is firing from the error message. If it's the scope audit, you may need to update `files_to_touch` in the task contract. If it's the import direction check, the dependency rules in `COMPONENTS.yaml` need amending via `/wf-command-sa`. If it's the suppression scan, fix the underlying lint issue instead of suppressing it.
-
-### "HALT: Same command 3 times"
-Claude is in a retry loop. The root-cause-tracing skill will be invoked. If you want to override, clear `/tmp/.workflow-cmd-history`.
 
 ### Pipeline state is corrupted
 Delete `.workflow/pipeline_state.yaml` and run `/wf-command-status` — it will be recreated with `idle` state.

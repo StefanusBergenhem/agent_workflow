@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Claude Code Workflow — Installation Script
-# Copies skills, commands, hooks, and global rules into ~/.claude/
+# Copies skills, commands, and global rules into ~/.claude/
 # Safe to run multiple times (idempotent).
 #
 # All artifacts are copied (not symlinked) so ~/.claude/ is fully
@@ -13,7 +13,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 SKILLS_DIR="$CLAUDE_DIR/skills"
 COMMANDS_DIR="$CLAUDE_DIR/commands"
-HOOKS_DIR="$CLAUDE_DIR/hooks"
 GLOBAL_CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
 MARKER="# --- Claude Code Workflow (managed block) ---"
 
@@ -23,19 +22,17 @@ echo ""
 # -------------------------------------------------------
 # 1. Create ~/.claude directories
 # -------------------------------------------------------
-echo "[1/6] Creating directories..."
+echo "[1/5] Creating directories..."
 mkdir -p "$SKILLS_DIR"
 mkdir -p "$COMMANDS_DIR"
-mkdir -p "$HOOKS_DIR"
 echo "  Created: $SKILLS_DIR"
 echo "  Created: $COMMANDS_DIR"
-echo "  Created: $HOOKS_DIR"
 
 # -------------------------------------------------------
 # 2. Copy skills
 # -------------------------------------------------------
 echo ""
-echo "[2/6] Copying skills..."
+echo "[2/5] Copying skills..."
 
 # Remove stale entries for old skill names
 for stale_skill in analyse plan build review orchestrate scope-guard root-cause-tracing verification receiving-feedback testing-anti-patterns; do
@@ -63,7 +60,7 @@ done
 # 3. Copy commands
 # -------------------------------------------------------
 echo ""
-echo "[3/6] Copying commands..."
+echo "[3/5] Copying commands..."
 
 # Remove stale entries for old command filenames
 for stale_cmd in analyse.md plan.md build.md review.md init.md status.md pipeline.md; do
@@ -94,7 +91,7 @@ done
 # 4. Append global-claude.md to ~/.claude/CLAUDE.md
 # -------------------------------------------------------
 echo ""
-echo "[4/6] Updating global CLAUDE.md..."
+echo "[4/5] Updating global CLAUDE.md..."
 if [ ! -f "$GLOBAL_CLAUDE_MD" ]; then
     # No existing CLAUDE.md — create with marker and content
     {
@@ -141,60 +138,7 @@ else
 fi
 
 # -------------------------------------------------------
-# 5. Copy hooks and install into settings.json
-# -------------------------------------------------------
-echo ""
-echo "[5/6] Installing hooks..."
-HOOKS_SOURCE="$SCRIPT_DIR/hooks/hooks.json"
-SETTINGS_FILE="$CLAUDE_DIR/settings.json"
-
-# Copy hook scripts to ~/.claude/hooks/
-hook_scripts_found=0
-for hook_script in "$SCRIPT_DIR"/hooks/*.sh "$SCRIPT_DIR"/hooks/*.bash "$SCRIPT_DIR"/hooks/*.py; do
-    if [ -f "$hook_script" ]; then
-        cp "$hook_script" "$HOOKS_DIR/"
-        chmod +x "$HOOKS_DIR/$(basename "$hook_script")"
-        echo "  Copied: $(basename "$hook_script") -> $HOOKS_DIR/"
-        hook_scripts_found=1
-    fi
-done
-if [ "$hook_scripts_found" -eq 0 ]; then
-    echo "  No hook scripts found."
-fi
-
-# Install hook config into settings.json with absolute paths to ~/.claude/hooks/
-if [ -f "$HOOKS_SOURCE" ]; then
-    # Rewrite relative paths to absolute ~/.claude/hooks/ paths
-    HOOKS_JSON=$(sed "s|hooks/|$HOOKS_DIR/|g" "$HOOKS_SOURCE")
-
-    if [ -f "$SETTINGS_FILE" ]; then
-        # Merge hooks into existing settings.json
-        if command -v python3 &>/dev/null; then
-            python3 -c "
-import json
-settings = json.load(open('$SETTINGS_FILE'))
-hooks = json.loads('''$HOOKS_JSON''')
-settings['hooks'] = hooks['hooks']
-json.dump(settings, open('$SETTINGS_FILE', 'w'), indent=2)
-print('  Merged hooks into: $SETTINGS_FILE')
-"
-        else
-            echo "  WARNING: python3 not found. Cannot merge hooks automatically."
-            echo "  Manually merge hooks from: $HOOKS_SOURCE"
-            echo "  into: $SETTINGS_FILE"
-            echo "  NOTE: Use absolute paths (prefix with $HOOKS_DIR/)"
-        fi
-    else
-        # No settings.json — create with hooks content (absolute paths)
-        echo "$HOOKS_JSON" > "$SETTINGS_FILE"
-        echo "  Created: $SETTINGS_FILE"
-    fi
-else
-    echo "  No hooks.json found, skipping config."
-fi
-
-# -------------------------------------------------------
-# 6. Summary
+# 5. Summary
 # -------------------------------------------------------
 echo ""
 echo "=== Installation Complete ==="
@@ -213,7 +157,5 @@ echo ""
 echo "Installed components:"
 echo "  Skills:   $SKILLS_DIR/"
 echo "  Commands: $COMMANDS_DIR/"
-echo "  Hooks:    $HOOKS_DIR/"
 echo "  Rules:    $GLOBAL_CLAUDE_MD"
-echo "  Config:   $SETTINGS_FILE"
 echo "  Templates: $SCRIPT_DIR/templates/ (reference only, not copied)"

@@ -551,7 +551,7 @@ All checks passing. Applied N migrations.
 
 Next steps:
   - Review .workflow/config.yaml — new sections added with defaults, customize as needed
-  - Run install.sh to update skills and hooks to latest versions
+  - Run install.sh to update skills and commands to latest versions
   - Run /wf-command-status to verify pipeline state
   - If docs/MEMORY.md was converted, review docs/MEMORY.yaml and delete the old .md file
 ```
