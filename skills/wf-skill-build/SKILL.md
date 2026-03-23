@@ -93,7 +93,7 @@ Read the log file after the command completes. This prevents terminal flooding a
 
 ### Red Phase
 1. Create or modify the test file(s) listed in `files_to_touch`.
-2. Implement every test case from `testing_mandate` in the contract.
+2. Write a test function for every case in `testing_mandate`. Each test must: (a) set up the specific inputs described, (b) invoke the code under test, (c) assert the specific outputs described. A test that passes without exercising the code under test is not implemented.
 3. **Before running tests, verify each test against the anti-pattern checklist.** Read [skills/wf-skill-testing-anti-patterns/SKILL.md](../wf-skill-testing-anti-patterns/SKILL.md) and check every test against the Quick Reference table (anti-patterns #1 through #9). Any match means the test needs restructuring before proceeding.
 4. Run the tests and **confirm they FAIL** — the implementation does not exist yet.
 5. **Record the failure output.** Save the key failure lines. This is TDD evidence that the Reviewer will verify.
@@ -165,7 +165,7 @@ After all tests pass:
 - Every `if/else`, `switch/case`, `match`, and ternary in code you wrote must have a dedicated test case.
 - Unit tests: no external dependencies (DB, network, filesystem). Use interface stubs or mocks.
 - Integration tests: real dependencies, appropriately tagged/separated.
-- Happy-path-only = INCOMPLETE. You must implement every case from `testing_mandate`.
+- Happy-path-only = INCOMPLETE. You must implement every case from `testing_mandate`. Each test must contain assertions that would FAIL if the described behavior were broken or deleted. A test that passes with a trivially wrong or empty implementation is not implemented.
 - Each test must pass the anti-pattern checklist (see Step 3, item 3).
 
 ### Coverage Metric Gate
@@ -175,33 +175,36 @@ After all unit tests pass, if `commands.coverage` is configured in `config.yaml`
 1. Run `commands.coverage` (pipe output to `/tmp/coverage.log 2>&1`). Read the log.
 2. Parse the coverage output for files listed in `files_to_touch`.
 3. If `coverage.enforce_on_new_files` is true (default) and any **new** file in `files_to_touch` has line coverage below `coverage.threshold` (default: 90%), HALT and report which files are under-covered with the actual percentages.
-4. Record the actual coverage percentages in `review_ready.yaml` under `coverage_metrics` (see schema below). Do NOT use narrative descriptions — use numbers.
+4. If `coverage.enforce_on_modified_files` is true (default) and any **modified** (not new) file in `files_to_touch` has line coverage below `coverage.threshold` (default: 90%), HALT and report which files are under-covered with the actual percentages.
+5. Record the actual coverage percentages in `review_ready.yaml` under `coverage_metrics` (see schema below). Do NOT use narrative descriptions — use numbers.
 
 If `commands.coverage` is not configured, skip this gate but note it in `review_ready.yaml`: `coverage_metrics: { tool: "not_configured" }`.
 
 ### Integration Test Execution
 
-If `testing_mandate.integration` is non-empty:
+If `testing_mandate.integration_tests` is non-empty:
 
 1. Verify integration test files were created in `files_to_touch`.
 2. If `commands.test_integration` is configured in `config.yaml`:
    - Run `commands.test_integration` (pipe output to `/tmp/test-integration.log 2>&1`). Read the log.
    - If tests pass: record results in `review_ready.yaml`.
    - If tests fail: apply the same retry discipline as unit tests (max 3 attempts, different approach each time, root-cause tracing on 2nd failure).
-   - If `commands.test_integration` is not configured: record in `review_ready.yaml`: `integration_tests: { status: "not_configured", files_created: [...] }`. Do NOT halt — file existence is sufficient when no runner is configured.
-3. If `testing_mandate.integration` is non-empty but no integration test file exists in `files_to_touch`, HALT and report.
+3. If `commands.test_integration` is not configured but `testing_mandate.integration_tests` is non-empty: this is a **degraded mode**. Record in `review_ready.yaml`: `integration_tests: { status: "not_runnable", warning: "commands.test_integration not configured — tests created but could not be executed", files_created: [...] }`. Verify the created test files pass type-checking and linting. Do NOT silently accept — the reviewer will flag this as a risk.
+4. If `commands.test_integration` is not configured and `testing_mandate.integration_tests` is empty: record `integration_tests: { status: "not_applicable" }`.
+5. If `testing_mandate.integration_tests` is non-empty but no integration test file exists in `files_to_touch`, HALT and report.
 
 ### E2E Test Execution
 
-If `testing_mandate.e2e` is non-empty:
+If `testing_mandate.e2e_tests` is non-empty:
 
 1. Verify e2e test files were created in `files_to_touch`.
 2. If `commands.test_e2e` is configured in `config.yaml`:
    - Run `commands.test_e2e` (pipe output to `/tmp/test-e2e.log 2>&1`). Read the log.
    - If tests pass: record results in `review_ready.yaml`.
    - If tests fail: apply retry discipline.
-   - If `commands.test_e2e` is not configured: record in `review_ready.yaml`: `e2e_tests: { status: "not_configured", files_created: [...] }`.
-3. If `testing_mandate.e2e` is non-empty but no e2e test file exists in `files_to_touch`, HALT and report.
+3. If `commands.test_e2e` is not configured but `testing_mandate.e2e_tests` is non-empty: this is a **degraded mode**. Record in `review_ready.yaml`: `e2e_tests: { status: "not_runnable", warning: "commands.test_e2e not configured — tests created but could not be executed", files_created: [...] }`. Verify the created test files pass type-checking and linting.
+4. If `commands.test_e2e` is not configured and `testing_mandate.e2e_tests` is empty: record `e2e_tests: { status: "not_applicable" }`.
+5. If `testing_mandate.e2e_tests` is non-empty but no e2e test file exists in `files_to_touch`, HALT and report.
 
 ---
 
@@ -297,14 +300,16 @@ test_files_created:
   e2e: []
 
 integration_tests:
-  status: "pass"              # "pass" | "fail" | "not_configured"
+  status: "pass"              # "pass" | "fail" | "not_runnable" | "not_applicable"
+  warning: ""                 # Non-empty when status is "not_runnable"
   command: "npm run test:integration"
   log_tail: "<last 20 lines from /tmp/test-integration.log>"
   files_created:
     - "src/module/feature.integration.test.ts"
 
 e2e_tests:
-  status: "not_configured"    # "pass" | "fail" | "not_configured"
+  status: "not_applicable"    # "pass" | "fail" | "not_runnable" | "not_applicable"
+  warning: ""                 # Non-empty when status is "not_runnable"
   files_created: []
 
 doc_updates_applied:

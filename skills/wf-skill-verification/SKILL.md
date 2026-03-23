@@ -171,7 +171,7 @@ Any of the following instantly disqualifies a "done" claim:
 | Suppressed failures | Adding `skip` to failing tests |
 | Scope violations | Files changed that aren't in `files_to_touch` |
 | Lingering debug code | `console.log` left in production code |
-| Untested error paths | Only happy-path tests exist |
+| Untested error paths | Every error/exception path in the implementation written for this task must have a corresponding test. If the implementation has N distinct error returns/throws, there must be at least N error-path tests. "Only happy-path tests exist" is a disqualifier. |
 
 ## Relationship to Other Skills
 

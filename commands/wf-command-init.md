@@ -69,8 +69,10 @@ commands:
   db_validate: ""                  # e.g., "npx prisma migrate status", "alembic check"
 
 coverage:
-  threshold: 90                    # Min line coverage % for new files
+  threshold: 90                    # Min line coverage % for new/modified files
   enforce_on_new_files: true
+  enforce_on_modified_files: true
+  integration_test_ratio: "per_external_dep"
 
 review:
   max_attempts: 3
@@ -188,7 +190,8 @@ Review and adjust match patterns for your directory structure.
 
 After generating the config, check for common gaps and warn the user:
 
-- **If `commands.test_integration` is empty:** Warn: "No integration test command configured. If your project has integration tests, set `commands.test_integration` in config. Without it, the pipeline cannot enforce integration test execution."
+- **If `commands.test_integration` is empty:** Scan project imports for external dependency indicators (database drivers: `pg`, `mysql`, `prisma`, `sqlalchemy`, `gorm`; HTTP clients: `axios`, `fetch`, `net/http`; message queues: `amqplib`, `kafka`, `nats`; caches: `redis`, `memcached`). If external dependencies are detected, WARN with elevated severity: "External dependencies detected but `commands.test_integration` is not configured. Tasks with external dependencies will create integration test files but the pipeline CANNOT execute them. Tests will be flagged as 'not_runnable' during review. Configure `commands.test_integration` to enable full testing enforcement." If no external dependencies detected, warn normally: "No integration test command configured. Set `commands.test_integration` if your project has integration tests."
+- **If `commands.test_e2e` is empty:** Warn: "No e2e test command configured. Tasks creating user-facing flows will produce e2e test files that cannot be executed. Configure `commands.test_e2e` to enable full e2e testing enforcement."
 - **If `commands.coverage` is empty:** Warn: "No coverage command configured. Without it, the pipeline cannot enforce code coverage thresholds. Set `commands.coverage` (e.g., `npx jest --coverage`)."
 - **If `commands.db_validate` is empty and the project uses a database** (detected via Prisma, SQLAlchemy, TypeORM, GORM, etc.): Warn: "Database detected but `commands.db_validate` is not configured. Set it to catch stale migrations (e.g., `npx prisma migrate status`)."
 
@@ -472,16 +475,18 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
     max_estimated_lines: 150
   ```
 
-#### Check 15 — Missing coverage section
+#### Check 15 — Missing or incomplete coverage section
 
-**Why:** The build skill reads `coverage.threshold` and `coverage.enforce_on_new_files` from config to enforce code coverage on new files. Without this section, the build skill uses hardcoded defaults but the config doesn't reflect the active thresholds.
+**Why:** The build and review skills read `coverage.threshold`, `coverage.enforce_on_new_files`, `coverage.enforce_on_modified_files`, and `coverage.integration_test_ratio` from config to enforce code coverage. Without this section or with missing fields, skills use hardcoded defaults but the config doesn't reflect the active thresholds.
 
-- **Detect:** No `coverage:` section in `.workflow/config.yaml`
-- **Action:** Append:
+- **Detect:** No `coverage:` section in `.workflow/config.yaml`, or section exists but is missing `enforce_on_modified_files` or `integration_test_ratio`
+- **Action:** If section missing, append full block. If section exists but incomplete, add missing fields with defaults:
   ```yaml
   coverage:
     threshold: 90
     enforce_on_new_files: true
+    enforce_on_modified_files: true
+    integration_test_ratio: "per_external_dep"
   ```
 
 #### Check 16 — Missing scaffolded files

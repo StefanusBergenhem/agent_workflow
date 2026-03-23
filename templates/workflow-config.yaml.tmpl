@@ -31,8 +31,10 @@ commands:
   db_validate: "{{DB_VALIDATE_CMD}}"      # e.g., "npx prisma migrate status", "alembic check"
 
 coverage:
-  threshold: 90                            # Minimum line coverage % for new files
+  threshold: 90                            # Minimum line coverage % for new/modified files
   enforce_on_new_files: true               # Require coverage check on files created by the task
+  enforce_on_modified_files: true           # Require coverage check on files modified by the task
+  integration_test_ratio: "per_external_dep"  # At least one integration test per external dependency interaction
 
 review:
   max_attempts: 3

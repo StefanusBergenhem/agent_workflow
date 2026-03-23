@@ -94,13 +94,18 @@ For each task (including splits), produce a full contract:
     - "Do NOT change the JWT signing algorithm"
 
   testing_mandate:
-    unit:
-      - "Happy path: valid token returns decoded payload"
-      - "Expired token: returns AuthError with code EXPIRED"
-      - "Malformed token: returns AuthError with code INVALID"
-    integration:
-      - "Round-trip: create token, validate token, get same payload"
-    e2e: []
+    unit_tests:
+      - description: "Happy path: valid token returns decoded payload"
+        covers: "AC-1"
+      - description: "Expired token: returns AuthError with code EXPIRED"
+        covers: "AC-2"
+      - description: "Malformed token: returns AuthError with code INVALID"
+        covers: "AC-2"
+    integration_tests:
+      - description: "Round-trip: create token, validate token, get same payload"
+        covers: "AC-1"
+    e2e_tests: []
+    # e2e_tests is empty: pure backend middleware, no user-facing flow.
 
   doc_updates_required:
     - path: "docs/API.md"
@@ -124,10 +129,14 @@ For each task (including splits), produce a full contract:
 - `implementation_notes` should reference actual code patterns found in the source
 
 **Integration test enforcement:**
-- If `files_to_touch` includes files that interact with external dependencies (database, network APIs, filesystem, message queues, caches), `testing_mandate.integration` MUST be non-empty. Scan the source code to detect these interactions — look for DB queries, HTTP clients, file I/O, queue producers/consumers.
+- If `files_to_touch` includes files that interact with external dependencies (database, network APIs, filesystem, message queues, caches), `testing_mandate.integration_tests` MUST be non-empty. Scan the source code to detect these interactions — look for DB queries, HTTP clients, file I/O, queue producers/consumers. **Minimum count heuristic:** read `coverage.integration_test_ratio` from config (default: `"per_external_dep"`). When set to `"per_external_dep"`, specify at least one integration test per distinct external system interaction path (e.g., a task that reads from a DB and calls an HTTP API needs at least 2 integration tests).
 - If a task creates new public endpoints or service interfaces, integration tests covering the interface round-trip are required.
-- If `testing_mandate.integration: []` is specified for a task that touches external dependencies, you MUST add a justification comment explaining why no integration tests are needed (e.g., `# No integration tests: pure computation, no external deps`). If you cannot justify it, add integration test cases.
+- If `testing_mandate.integration_tests: []` is specified for a task that touches external dependencies, you MUST add a justification comment explaining why no integration tests are needed (e.g., `# No integration tests: pure computation, no external deps`). If you cannot justify it, add integration test cases.
 - The pipeline cannot run integration tests (it runs in Docker without infrastructure). But the test FILES must be created by the developer so they can be validated on the host via `/wf-command-ship`.
+- **E2E test enforcement:** If `testing_mandate.e2e_tests: []` is specified for a task that creates or modifies user-facing flows (HTTP endpoints, CLI commands, UI components), you MUST add a justification comment explaining why no e2e tests are needed. If you cannot justify it, add e2e test cases.
+- **Test pyramid self-validation:** After generating `testing_mandate` for each task, verify the pyramid is balanced:
+  - External dependencies in `files_to_touch` but `integration_tests` empty without justification → error, go back and add integration test cases or a justification.
+  - User-facing flows in `files_to_touch` but `e2e_tests` empty without justification → error, go back and add e2e test cases or a justification.
 
 ### Step 4 — Validate Component Boundaries
 
