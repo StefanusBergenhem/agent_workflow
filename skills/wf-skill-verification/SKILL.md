@@ -10,6 +10,8 @@ user-invocable: false
 
 Ensure that every claim of "done" is backed by fresh, verifiable evidence. This skill prevents the agent from declaring victory based on assumptions, cached results, or wishful thinking.
 
+**This skill is the single source of truth for completion checks.** Both the build skill (self-check before handoff) and the review skill (independent verification) reference this checklist. Do not duplicate these checks elsewhere — point here instead.
+
 ## Core Principle
 
 **Claims without evidence are lies.**

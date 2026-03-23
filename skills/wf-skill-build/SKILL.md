@@ -20,6 +20,7 @@ You are the Lead Developer. You execute the contract in `.workflow/current_task.
 | Context Files | Listed in `context_to_load` | ONLY these files. No speculative exploration. |
 | Config | `config.yaml` | Project-level settings, paths, commands |
 | Components | `COMPONENTS.yaml` (`paths.components` in config) | Component boundaries and dependency rules (for design issue detection) |
+| Verification | [skills/wf-skill-verification/SKILL.md](../wf-skill-verification/SKILL.md) | Canonical completion checklist — **must be loaded**, not discovered |
 
 ---
 
@@ -38,6 +39,7 @@ You are the Lead Developer. You execute the contract in `.workflow/current_task.
 4. If the task has `depends_on`, verify that dependency is merged into the current branch. If not, HALT and report.
    - **Worktree mode:** When running inside a worktree (parallel stage execution), `depends_on` tasks from prior stages are already merged into `origin/main` from which the worktree branched. Only check for dependencies within the same stage.
 5. Read `COMPONENTS.yaml` (`paths.components` in config) if it exists — needed for design issue detection (Step 3b).
+6. Read [skills/wf-skill-verification/SKILL.md](../wf-skill-verification/SKILL.md) — the canonical completion checklist used in Step 6. This is mandatory, not optional.
 
 ---
 
@@ -219,14 +221,9 @@ Update every file listed in `doc_updates_required` in the contract:
 
 ## Step 6 — Pre-Handoff Self-Check
 
-Before running the final preflight, apply this 6-point verification checklist:
+Execute the **full verification checklist** from [skills/wf-skill-verification/SKILL.md](../wf-skill-verification/SKILL.md). Every item must pass. Present evidence in the format the verification skill specifies. Do not abbreviate, skip, or summarize — run every check, capture every output.
 
-1. **Tests are fresh.** Re-run all tests (not from cache) — confirm 0 failures with current output.
-2. **No stale state.** No leftover debug prints, no commented-out code, no TODO comments.
-3. **Assertions are meaningful.** Re-verify against the anti-pattern checklist (Step 3, item 3) — especially anti-pattern #3 (weak assertions).
-4. **Scope is clean.** Only files in `files_to_touch` were modified (check with `git diff --name-only`).
-5. **Acceptance criteria met.** Re-read each criterion from the contract and confirm the implementation satisfies it.
-6. **Documentation complete.** All entries in `doc_updates_required` have been updated.
+The verification skill is the source of truth for what "done" means. If it says run it, run it. If it says show evidence, show evidence.
 
 ### Preflight Gate
 
@@ -328,7 +325,7 @@ doc_updates_applied:
    - Do NOT restart the entire task from scratch
    - Do NOT address issues not listed in the feedback
 4. **Design issue check:** If the fix reveals an architectural problem (same criteria as Step 3b), write a design issue and HALT instead of continuing to fail.
-5. Re-run the verification checklist (Step 6) and preflight.
+5. Re-run the full verification checklist from [skills/wf-skill-verification/SKILL.md](../wf-skill-verification/SKILL.md) (Step 6) and preflight.
 6. Overwrite `.workflow/review_ready.yaml` with updated results.
 7. Re-stage modified files.
 

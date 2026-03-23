@@ -19,6 +19,7 @@ You are the QA Reviewer. You validate the Developer's work against the Architect
 | Review Ready | `.workflow/review_ready.yaml` | What was claimed done (the Developer's report) |
 | Git Diff | `git diff origin/main` | What actually changed (ground truth) |
 | Config | `config.yaml` | Project-level settings, paths, commands |
+| Verification | [skills/wf-skill-verification/SKILL.md](../wf-skill-verification/SKILL.md) | Canonical completion checklist — **must be loaded**, not discovered |
 | Memory | `docs/MEMORY.yaml` (`paths.memory` in config) | Known rule violations, past lessons |
 | Conventions | `docs/CONVENTIONS.md` (`paths.conventions` in config) | Code style and pattern rules |
 | Components | `COMPONENTS.yaml` (`paths.components` in config) | Component registry with `summary`, `owns` fields, dependency rules, and ownership validation |
@@ -41,9 +42,10 @@ Read in this exact order:
 1. `.workflow/current_task.yaml` — the contract (what was required)
 2. `.workflow/review_ready.yaml` — the claim (what the Developer says was done)
 3. Run `git diff origin/main` — the actual changes (ground truth)
-4. Memory file — check for known rule violations and past mistakes
-5. Conventions file(s) — the coding standards the implementation must follow
-6. `COMPONENTS.yaml` (`paths.components` in config) — component boundaries, dependency rules, `summary` and `owns` fields for ownership validation
+4. [skills/wf-skill-verification/SKILL.md](../wf-skill-verification/SKILL.md) — the canonical completion checklist. This is mandatory, not optional. Several QA checks below reference it.
+5. Memory file — check for known rule violations and past mistakes
+6. Conventions file(s) — the coding standards the implementation must follow
+7. `COMPONENTS.yaml` (`paths.components` in config) — component boundaries, dependency rules, `summary` and `owns` fields for ownership validation
 
 **The diff is the source of truth.** If the claim in `review_ready.yaml` contradicts the diff, the diff wins.
 
@@ -64,12 +66,14 @@ External skills augment the QA checklist — they do **not** replace P0-P3 check
 
 Execute the checklist in priority order. Stop at the first P0 failure — do not continue checking lower priorities if a P0 fails. **Announce each priority level** as you begin it: "Checking P0 — Critical checks", "Checking P1 — Test quality", etc.
 
+Several checks below reference the **Verification Checklist** (loaded in Step 1, item 4). Those references use §-notation (e.g., "§3" = checklist item 3). The verification skill defines the exact check procedure and evidence format — follow it precisely. The reviewer's addition is to run each check **independently**, never trusting the builder's evidence.
+
 #### P0 — Critical (any failure = immediate REJECT)
 
 | # | Check | What to verify | Fail Action |
 |:--|:------|:---------------|:------------|
 | 0.1 | **Security scan** | Scan the diff for: SQL injection (string concatenation in queries), XSS (`dangerouslySetInnerHTML`, raw DOM insertion), hardcoded credentials/secrets, auth bypass (endpoints without auth middleware), input validation gaps (missing type/length/enum checks), secret exposure in error messages | REJECT with `security_violation` |
-| 0.2 | **Scope audit** | Compare `git diff --name-only origin/main` against `files_to_touch` in the contract. Every modified file MUST be in the contract's scope. | REJECT with `scope_violation` |
+| 0.2 | **Scope audit** | Execute Verification Checklist §3 (Scope Compliance) independently. Compare `git diff --name-only origin/main` against `files_to_touch`. Do not trust the builder's scope claim. | REJECT with `scope_violation` |
 | 0.3 | **Acceptance criteria** | Re-read each criterion in `acceptance_criteria`. For each one, find the specific code or test in the diff that satisfies it. If any criterion is not demonstrably met, reject. | REJECT with `acceptance_criteria_unmet` |
 | 0.4 | **Architecture compliance** | Check that modified files belong to the correct component per `COMPONENTS.yaml` (`paths.components` in config). Verify the task's component owns the concepts being implemented per the component's `summary` and `owns` fields in `COMPONENTS.yaml`. Check that any new imports respect `dependency_rules`. | REJECT with `architecture_violation` or write design issue |
 
@@ -79,8 +83,8 @@ Execute the checklist in priority order. Stop at the first P0 failure — do not
 |:--|:------|:---------------|:------------|
 | 1.1 | **Test existence** | Every case from `testing_mandate` has a test function that: (a) sets up the described scenario, (b) exercises the code path, (c) asserts the expected outcome. A test function that exists but contains no meaningful assertions is equivalent to a missing test. Error paths, boundary conditions, and edge cases are covered — not just the happy path (see anti-pattern #8 in the testing anti-patterns skill). | REJECT with `test_missing` |
 | 1.2 | **Test quality** | Read [skills/wf-skill-testing-anti-patterns/SKILL.md](../wf-skill-testing-anti-patterns/SKILL.md). Check every test against the Quick Reference table — all 9 anti-patterns (#1 through #9). Any match is grounds for rejection with a specific citation of which anti-pattern was violated and why. | REJECT with `test_quality` |
-| 1.3 | **TDD evidence** | `tdd_evidence` in `review_ready.yaml` shows a red phase with real failure messages that correspond to the test cases. If the red phase is missing, vague, or fake, reject. | REJECT with `tdd_missing` |
-| 1.4 | **Suppression scan** | Scan the diff for suppression directives: `@ts-ignore`, `// nolint`, `# type: ignore`, `eslint-disable`, `noqa`, `@SuppressWarnings`, or any equivalent. | REJECT with `convention_violation` |
+| 1.3 | **TDD evidence** | Execute Verification Checklist §7 (Red-Phase Evidence). Verify `tdd_evidence` in `review_ready.yaml` shows real failure messages corresponding to test cases. If missing, vague, or fake, reject. | REJECT with `tdd_missing` |
+| 1.4 | **Suppression scan** | Execute Verification Checklist §4 (No Suppression Directives). Scan the diff independently — do not trust the builder's clean-code claims. | REJECT with `convention_violation` |
 | 1.5 | **Coverage verification** | If `commands.coverage` is configured: run it independently (pipe to `/tmp/review-coverage.log 2>&1`). Parse output for files in `files_to_touch`. Verify every **new** file meets `coverage.threshold` (default 90%). If `coverage.enforce_on_modified_files` is true (default), also verify every **modified** file meets `coverage.threshold`. Do NOT trust the builder's `coverage_metrics` — run independently. If `coverage_metrics.tool` is `"not_configured"` in `review_ready.yaml` but `commands.coverage` IS configured in `config.yaml`, reject — the builder skipped coverage. | REJECT with `coverage_insufficient` |
 | 1.6 | **Integration/E2E test execution** | For each non-empty entry in `testing_mandate`: (a) Verify corresponding test file exists in diff. (b) If `commands.test_integration` / `commands.test_e2e` is configured, run tests independently (pipe to `/tmp/review-integration.log 2>&1` / `/tmp/review-e2e.log 2>&1`). Do NOT trust the builder's claims — run independently. (c) If test command is not configured but `testing_mandate` has entries (degraded mode): verify test files exist, pass type-checking and linting, and contain real assertions (not empty stubs or placeholder `expect(true).toBe(true)`). Each test function must set up inputs, invoke code, and assert outcomes. If test files are stubs or empty, REJECT. Flag the `not_runnable` status as a **P1 risk** in the feedback — note that these tests could not be executed and recommend configuring the test command. Cross-reference results against `review_ready.yaml` claims. | REJECT with `test_missing` or `integration_test_fail` or `e2e_test_fail` or `test_not_runnable_risk` |
 
@@ -93,13 +97,13 @@ Execute the checklist in priority order. Stop at the first P0 failure — do not
 | 2.1 | **Independent lint** | Run `commands.lint` from config yourself on the modified files. Do not trust the Developer's refactor-phase lint claim — run it independently. If `commands.lint` is not configured, HALT. | REJECT with `lint_fail` |
 | 2.2 | **Documentation** | All files in `doc_updates_required` were updated. New functions/endpoints have purpose, params, return, and side effects documented. No placeholder text or TODOs. Also verify: (a) the sprint file has the task marked `[DONE]`; (b) if `doc_updates_required` omits codebase/conventions/ADR entries, a comment in the contract explains why. | REJECT with `doc_missing` or `doc_quality` |
 | 2.3 | **Conventions compliance** | Code follows the conventions file(s) listed in `context_to_load`. Check naming, patterns, structure, error handling, imports. | REJECT with `convention_violation` |
-| 2.4 | **Clean code** | No leftover debug output (`fmt.Println`, `console.log`, `print()`, `log.Println` used for debugging). No commented-out code blocks. No TODO/HACK/FIXME comments in production code. | REJECT with `clean_code_violation` |
+| 2.4 | **Clean code** | Execute Verification Checklist §5 (No Debug Output) and §6 (No TODO Comments). Scan the diff independently for debug statements, commented-out code, and TODO/HACK/FIXME comments. | REJECT with `clean_code_violation` |
 
 #### P3 — Integration (any failure = REJECT)
 
 | # | Check | What to verify | Fail Action |
 |:--|:------|:---------------|:------------|
-| 3.1 | **Independent preflight** | Run the preflight command (`commands.preflight` from config) yourself. Do not trust the Developer's preflight claim — run it independently. | REJECT with `preflight_fail` |
+| 3.1 | **Independent preflight** | Execute Verification Checklist §2 (Preflight Pass) independently. Run `commands.preflight` from config yourself — do not trust the Developer's preflight claim. | REJECT with `preflight_fail` |
 
 ### Step 2b — Architecture Compliance Detail
 
