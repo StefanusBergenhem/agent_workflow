@@ -69,7 +69,8 @@ Manual (you decide when):
 
 Automated (runs autonomously via /wf-command-pipeline):
   compute stages → plan worktrees → approve → execute (build + review) → merge
-  → retrospective (+ lesson extraction & archival) → idle
+  → e2e validation (fix cycle if failing) → retrospective (+ lesson extraction & archival) → idle
+  Then run /wf-command-ship to validate, push, and create PR
 ```
 
 ## Skill Authoring Guides

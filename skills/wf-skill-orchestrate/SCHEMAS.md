@@ -7,7 +7,7 @@
 current_phase: "idle"
 # Valid: idle | creating_sprint_branch | computing_stages | planning_worktrees |
 #        executing_stage | stage_complete |
-#        retrospective | publishing | escalated
+#        e2e_validation | retrospective | escalated
 
 sprint_id: ""                    # Set from sprint.yaml
 sprint_branch: ""                # Set during creating_sprint_branch (e.g., "sprint/S1")

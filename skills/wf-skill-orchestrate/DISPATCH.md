@@ -47,6 +47,28 @@ Sub-agent receives:
 - `COMPONENTS.yaml` (for architecture compliance)
 - External skills config from `config.external_skills` (if configured)
 
+### E2E Fix Cycle (per-attempt, in worktree)
+Model: `config.yaml → models.build` (default: `sonnet`) for build, `config.yaml → models.review` (default: `sonnet`) for review
+
+Build sub-agent receives (same as normal build, but with synthetic task contract):
+- `skills/wf-skill-build/SKILL.md`
+- `skills/wf-skill-testing-anti-patterns/SKILL.md`
+- `config.yaml`
+- `<worktree_path>/.workflow/current_task.yaml` (synthetic E2E-FIX contract)
+- `<worktree_path>/.workflow/feedback.yaml` (e2e failure details)
+- Memory file at `paths.memory`
+- `COMPONENTS.yaml`
+
+Review sub-agent receives (same as normal review):
+- `skills/wf-skill-review/SKILL.md`
+- `skills/wf-skill-testing-anti-patterns/SKILL.md`
+- `config.yaml`
+- `<worktree_path>/.workflow/current_task.yaml`
+- `<worktree_path>/.workflow/review_ready.yaml`
+- Git diff (via `git diff origin/<sprint_branch>` within the worktree)
+- Memory file at `paths.memory`
+- `COMPONENTS.yaml`
+
 ### Retrospective Phase
 Model: `config.yaml → models.retrospective` (default: `sonnet`)
 Sub-agent receives:

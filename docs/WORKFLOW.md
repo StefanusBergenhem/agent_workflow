@@ -84,12 +84,11 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
       → merge approved tasks to sprint branch
       → halt tasks with design issues → write design_issues.yaml
       → escalate tasks with 3 failures
-  → after all stages: run retrospective
-  → produce retrospective/<sprint-id>.md
+  → after all stages: run e2e validation (fix cycle if failing)
+  → run retrospective → produce retrospective/<sprint-id>.md
   → extract lessons into docs/MEMORY.yaml (continuous learning)
   → archive retrospective + metrics to archive directories
-  → push sprint branch + create PR to main
-  → idle
+  → idle (run /wf-command-ship to push + create PR)
 ```
 
 ---
@@ -98,94 +97,138 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
 
 Complete workflow from product strategy through sprint delivery:
 
-```mermaid
-flowchart TD
-    %% ── Manual Phases ──────────────────────────────────
-    subgraph manual ["Manual Phases (human-paced, approval-gated)"]
-        direction TB
-        STRAT["/wf-command-strategist\n<i>Product Strategist</i>"]
-        STRAT -->|"roadmap.yaml"| SA
+```
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║  Manual Phases (human-paced, approval-gated)                   ║
+  ║                                                                ║
+  ║  +---------------------------+                                 ║
+  ║  | /wf-command-strategist    |                                 ║
+  ║  | Product Strategist        |                                 ║
+  ║  +-------------+-------------+                                 ║
+  ║                | roadmap.yaml                                  ║
+  ║                v                                               ║
+  ║  +---------------------------+                                 ║
+  ║  | /wf-command-sa            |                                 ║
+  ║  | Solution Architect        |                                 ║
+  ║  | Ground → Diagnose →      |                                 ║
+  ║  | Design → Plan → Commit   |                                 ║
+  ║  +-------------+-------------+                                 ║
+  ║                | master_backlog.yaml + COMPONENTS.yaml         ║
+  ║                v                                               ║
+  ║  +---------------------------+                                 ║
+  ║  | /wf-command-swa           |                                 ║
+  ║  | Software Architect        |                                 ║
+  ║  | Reads source, consults    |                                 ║
+  ║  | MEMORY.yaml, sizes tasks  |                                 ║
+  ║  +-------------+-------------+                                 ║
+  ║                | sprint.yaml (with task contracts)             ║
+  ╚════════════════|═══════════════════════════════════════════════╝
+                   v
+  +-------------------------------+
+  | /wf-command-pipeline          |
+  | Orchestrator — state machine  |
+  +---------------+---------------+
+                  |
+                  v
+  +-------------------------------+
+  | Create sprint branch          |
+  | sprint/<sprint-id>            |
+  +---------------+---------------+
+                  |
+                  v
+  +-------------------------------+
+  | Compute stages                |
+  | (topological sort)            |
+  +---------------+---------------+
+                  |
+                  v
+  +-------------------------------+
+  | Plan worktrees                |     <--------------------+
+  | (one per task)                |                          |
+  +---------------+---------------+                          |
+                  |                                          |
+                  v                                          |
+  ╔═══════════════════════════════════════════════╗          |
+  ║  Stage Execution (parallel per task)          ║          |
+  ║                                               ║          |
+  ║  +------------------+                         ║          |
+  ║  | Build            |                         ║          |
+  ║  | Red → Green →    |                         ║          |
+  ║  | Refactor →       |  <---+                  ║          |
+  ║  | Preflight        |      |                  ║          |
+  ║  +--------+---------+      |                  ║          |
+  ║           |                |                  ║          |
+  ║           v                |                  ║          |
+  ║  +------------------+      |                  ║          |
+  ║  | Review           |      |                  ║          |
+  ║  | P0: Security,    |      |                  ║          |
+  ║  |     Scope, Arch  |      |                  ║          |
+  ║  | P1: Test quality |      |                  ║          |
+  ║  | P2: Conventions  |      |                  ║          |
+  ║  | P3: Preflight    |      |                  ║          |
+  ║  +---+---------+----+      |                  ║          |
+  ║      |    |    |           |                  ║          |
+  ║      |    |    +-- REJECTED (feedback.yaml)   ║          |
+  ║      |    |        Attempt < 3? --Yes---------+          |
+  ║      |    |        No --> Halt + Escalate     ║          |
+  ║      |    |                                   ║          |
+  ║      |    +--- DESIGN_ISSUE                   ║          |
+  ║      |         (design_issues.yaml)           ║          |
+  ║      |         Halt task, block dependents    ║          |
+  ║      |         ....> Requires SA resolution   ║          |
+  ║      |                                        ║          |
+  ║      +-- APPROVED                             ║          |
+  ║          |                                    ║          |
+  ║          v                                    ║          |
+  ║  +------------------+                         ║          |
+  ║  | Merge --no-ff    |                         ║          |
+  ║  | to sprint branch |                         ║          |
+  ║  +--------+---------+                         ║          |
+  ║           |                                   ║          |
+  ║       Conflict? --Yes--> Abort + Escalate     ║          |
+  ║           |No                                 ║          |
+  ║           v                                   ║          |
+  ║     Task completed                            ║          |
+  ╚═══════════════════════════════════════════════╝          |
+                  |                                          |
+            More stages? --Yes----------------------------->-+
+                  |No
+                  v
+  +-------------------------------+
+  | E2E Validation                |
+  | Run commands.test_e2e on      |
+  | merged sprint branch          |
+  +---+-----------+---------------+
+      |           |
+    Pass        Fail
+      |           +---> Build/Review fix cycle
+      |           |     (max 3 attempts, then escalate)
+      |           +---> Re-run e2e on success
+      |           |
+      +<----------+
+      |
+      v
+  +-------------------------------+
+  | Retrospective                 |
+  | Analyse patterns, metrics,   |
+  | generate improvements         |
+  +---------------+---------------+
+                  | retrospective/<sprint-id>.md
+                  v
+  +-------------------------------+
+  | Continuous Learning           |
+  | Extract lessons → deduplicate |
+  | → enforce capacity → archive  |
+  +---------------+---------------+
+                  | docs/MEMORY.yaml (updated)
+                  | ....> Lessons feed next SWA sprint
+                  v
+            [Pipeline idle]
+            Run /wf-command-ship to push + create PR
 
-        SA["/wf-command-sa\n<i>Solution Architect</i>\n\n5 phases: Ground → Diagnose →\nDesign → Plan → Commit"]
-        SA -->|"master_backlog.yaml\nCOMPONENTS.yaml\n(with summaries)"| SWA
-
-        SWA["/wf-command-swa\n<i>Software Architect</i>\n\nReads source code, consults\ndocs/MEMORY.yaml, sizes tasks"]
-        SWA -->|"sprint.yaml\n(with task contracts)"| PIPELINE
-    end
-
-    %% ── Automated Pipeline ─────────────────────────────
-    PIPELINE["/wf-command-pipeline\n<i>Orchestrator — state machine</i>"]
-
-    PIPELINE --> BRANCH["Create sprint branch\n<code>sprint/&lt;sprint-id&gt;</code>"]
-    BRANCH --> TOPO["Compute stages\n(topological sort of depends_on)"]
-    TOPO --> PLAN_WT["Plan worktrees\n(one worktree + branch per task)"]
-
-    %% ── Stage Execution ────────────────────────────────
-    subgraph stage ["Stage Execution (parallel per task)"]
-        direction TB
-        BUILD["Build\n<i>wf-skill-build</i>\n\nRed → Green → Refactor\nPreflight → Stage files"]
-
-        BUILD --> REVIEW["Review\n<i>wf-skill-review</i>\n\nP0: Security, Scope, Criteria,\n    Architecture compliance\nP1: Test quality, TDD evidence\nP2: Docs, conventions, clean code\nP3: Independent preflight"]
-
-        REVIEW -->|"APPROVED"| MERGE["Commit + Push branch\nMerge --no-ff to sprint branch"]
-        REVIEW -->|"REJECTED\n(feedback.yaml)"| RETRY{"Attempt\n< 3?"}
-        REVIEW -->|"DESIGN_ISSUE\n(design_issues.yaml)"| HALT_DI["Halt task\nBlock dependents"]
-
-        RETRY -->|"Yes"| BUILD
-        RETRY -->|"No — escalate"| HALT_ESC["Halt task\nBlock dependents\nEscalate to human"]
-
-        MERGE --> CONFLICT{"Merge\nconflict?"}
-        CONFLICT -->|"No"| DONE["Task completed ✓"]
-        CONFLICT -->|"Yes"| HALT_MC["Abort merge\nEscalate to human"]
-    end
-
-    PLAN_WT --> stage
-
-    %% ── Stage Loop ─────────────────────────────────────
-    stage --> STAGE_CHK{"More\nstages?"}
-    STAGE_CHK -->|"Yes"| PLAN_WT
-    STAGE_CHK -->|"No"| RETRO
-
-    %% ── Post-Execution ─────────────────────────────────
-    RETRO["Retrospective\n<i>wf-skill-retrospective</i>\n\nAnalyse patterns, metrics,\ngenerate improvements"]
-    RETRO -->|"retrospective/&lt;sprint-id&gt;.md"| LEARN
-
-    LEARN["Continuous Learning\n<i>wf-skill-continuous-learning</i>\n\nExtract lessons → deduplicate →\nenforce capacity → archive"]
-    LEARN -->|"docs/MEMORY.yaml\n(updated)"| PUBLISH
-
-    PUBLISH["Publishing\n\ngit push sprint branch\ngh pr create → main\nAppend to trends.yaml"]
-    PUBLISH --> IDLE(["Pipeline idle"])
-
-    %% ── Feedback to next sprint ────────────────────────
-    LEARN -.->|"Lessons feed\nnext sprint"| SWA
-
-    %% ── Design issue resolution ────────────────────────
-    HALT_DI -.->|"Requires architect\nresolution"| SA
-
-    %% ── Cross-cutting skills ───────────────────────────
-    subgraph xcut ["Cross-cutting Skills (always active)"]
-        direction LR
-        X1["Scope Guard"]
-        X2["Verification"]
-        X3["Root-Cause Tracing"]
-        X4["Receiving Feedback"]
-        X5["Testing Anti-Patterns"]
-        X6["Observability"]
-    end
-    xcut -.->|"Consulted by\nbuild + review"| stage
-
-    %% ── Styling ────────────────────────────────────────
-    classDef manualNode fill:#4a90d9,stroke:#2c5aa0,color:#fff
-    classDef autoNode fill:#2ecc71,stroke:#1a9850,color:#fff
-    classDef haltNode fill:#e74c3c,stroke:#c0392b,color:#fff
-    classDef xcutNode fill:#9b59b6,stroke:#7d3c98,color:#fff
-    classDef idleNode fill:#95a5a6,stroke:#7f8c8d,color:#fff
-
-    class STRAT,SA,SWA manualNode
-    class PIPELINE,BRANCH,TOPO,PLAN_WT,BUILD,REVIEW,MERGE,DONE,RETRO,LEARN,PUBLISH autoNode
-    class HALT_DI,HALT_ESC,HALT_MC haltNode
-    class X1,X2,X3,X4,X5,X6 xcutNode
-    class IDLE idleNode
+  Cross-cutting skills (consulted by build + review):
+    Scope Guard | Verification | Root-Cause Tracing
+    Receiving Feedback | Testing Anti-Patterns | Observability
 ```
 
 ---
@@ -212,7 +255,8 @@ After resume detection:
 3. For each stage: creates worktrees (from sprint branch), then executes all tasks in parallel
 4. Approved tasks merge to the sprint branch immediately; rejected tasks retry up to 3 times
 5. Design issues halt the affected task (no retries — requires architect fix)
-6. After all stages: runs retrospective, then pushes sprint branch and creates a PR to main
+6. After all stages: runs e2e validation (with fix cycle if failing), then retrospective
+7. Pipeline ends at idle — run `/wf-command-ship` to validate, push, and create a PR to main
 
 ### Within each stage execution (parallel per task)
 
@@ -259,7 +303,7 @@ Reports: current phase, stage progress (N of M), per-task status within the acti
 - **Roadmap mode** (when `roadmap.yaml` exists) — translates roadmap into technical strategy
 - **Ongoing mode** (when only `master_backlog.yaml` exists) — evaluates system health, updates architecture, cuts next sprint from existing backlog
 
-The SA thinks out loud — showing reasoning, presenting alternatives with tradeoffs, and using Mermaid diagrams to make architecture visible during the conversation.
+The SA thinks out loud — showing reasoning, presenting alternatives with tradeoffs, and using ASCII art diagrams to make architecture visible during the conversation.
 
 **You decide when to run this.** After strategist (roadmap mode), or whenever architecture needs updating and you want to cut the next sprint (ongoing mode).
 
@@ -295,7 +339,7 @@ Diagrams are ephemeral conversation tools — they help you see the system durin
 
 **Runs fully autonomously** — no human approval gates during execution.
 
-**Output:** Sprint branch with merged code, `retrospective/<sprint-id>.md`, and a pull request to main.
+**Output:** Sprint branch with merged code and `retrospective/<sprint-id>.md`. Run `/wf-command-ship` after to push and create a PR to main.
 
 ### /wf-command-build — TDD Execution
 
@@ -467,7 +511,7 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 idle → creating_sprint_branch → computing_stages → planning_worktrees →
   executing_stage → stage_complete →
     [more stages?] → planning_worktrees (next stage)
-    [all done?] → retrospective (+ learning) → publishing (push + PR) → idle
+    [all done?] → e2e_validation → retrospective (+ learning) → idle
 ```
 
 ### Per-task lifecycle (within a stage)
@@ -525,7 +569,9 @@ parallel:
 
 4. **Stage completion** — When all tasks in a stage are completed, escalated, or halted (design issue), worktrees are cleaned up and the next stage begins.
 
-5. **Publishing** — After retrospective, the sprint branch is pushed and a PR is created to main with a sprint summary.
+5. **E2E Validation** — After all stages, e2e tests run on the merged sprint branch. Failures trigger a build/review fix cycle (max 3 attempts). On pass or escalation, the pipeline proceeds to retrospective.
+
+6. **Ship** — After the pipeline completes (idle), run `/wf-command-ship` to validate, push, and create a PR to main.
 
 ### Context management
 
@@ -799,7 +845,7 @@ git worktree remove <path> --force
 The task is halted — it cannot be retried. Resolve the design issue via `/wf-command-sa` (architecture change) or `/wf-command-swa` (task re-plan), then re-run the pipeline.
 
 ### All tasks in a stage are blocked
-If every task in remaining stages depends on an escalated or design-issue task, the pipeline transitions to `retrospective` → `publishing` → `idle`. Resolve the blocking issue first, then re-run `/wf-command-pipeline`.
+If every task in remaining stages depends on an escalated or design-issue task, the pipeline transitions to `e2e_validation` → `retrospective` → `idle`. Resolve the blocking issue first, then re-run `/wf-command-pipeline`.
 
 ### Want to start fresh on a task
 Delete the task's worktree (`git worktree remove <path>`), clear its entry from `pipeline_state.yaml` task_states, and re-plan.

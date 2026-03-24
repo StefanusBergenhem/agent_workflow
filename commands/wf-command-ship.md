@@ -7,16 +7,16 @@ Ship the sprint branch after full validation. This command runs on the **host ma
 
 ## Prerequisites
 
-- The pipeline must have completed (all stages done, retrospective finished)
+- The pipeline must have completed (all stages done, retrospective finished, phase is `idle`)
 - You must be on the sprint branch (or it must exist locally)
 - Infrastructure (DB, services) must be running for integration/e2e tests
-- GitHub CLI (`gh`) or git remote must be configured for push
+- GitHub CLI (`gh`) must be configured for push and PR creation
 
 ## Steps
 
 ### 1. Verify pipeline completed
 
-Read `.workflow/pipeline_state.yaml`. Check that `current_phase` is `idle`, `publishing`, or `retrospective` (post-execution states). If the pipeline is still in `executing_stage` or earlier, HALT and report: "Pipeline is still running. Wait for completion before shipping."
+Read `.workflow/pipeline_state.yaml`. Check that `current_phase` is `idle`. If the pipeline is in any other phase (`executing_stage`, `e2e_validation`, `retrospective`, etc.), HALT and report: "Pipeline is still running. Wait for completion before shipping."
 
 ### 2. Identify sprint branch
 
@@ -84,23 +84,37 @@ Print a summary table:
 All checks passed.
 ```
 
-### 5. Push to GitHub
+### 5. Push and create PR
 
 If all checks pass:
 ```bash
 git push -u origin <sprint_branch>
 ```
 
-Print the branch name and suggest next steps:
-```
-Sprint branch pushed: sprint/S1
+Then create a pull request:
+```bash
+gh pr create \
+  --base main \
+  --head ${SPRINT_BRANCH} \
+  --title "Sprint <sprint_id>: <sprint summary from sprint.yaml>" \
+  --body "$(cat <<'EOF'
+## Sprint Summary
+<bullet list of completed tasks with their titles>
 
-Next steps:
-  - Create a PR: gh pr create --base main --head sprint/S1
-  - Or review the branch on GitHub
+## Results
+- **Completed:** <N> / <total> tasks
+- **Escalated:** <list or "none">
+- **Design issues:** <list or "none">
+
+## Retrospective
+See `retrospective/<sprint-id>.md` for details.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
 ```
 
-Do NOT create the PR automatically — let the user decide.
+Print the PR URL to the user.
 
 ### On failure
 
@@ -115,8 +129,9 @@ Do NOT attempt to fix anything. Do NOT push. The user investigates and re-runs `
 
 ## Hard Constraints
 
-- **Never push on failure.** Any single check failing means no push.
+- **Never push on failure.** Any single check failing means no push, no PR.
 - **Never auto-fix.** Report and stop. The user or pipeline handles fixes.
 - **Run checks in order.** Unit → Integration → E2E → Coverage → DB. Stop at first failure.
 - **Log everything.** All command output goes to `/tmp/ship-*.log` files.
 - **Host-only.** This command expects infrastructure access. If a test fails because infrastructure is unavailable, report it clearly — don't treat it as a test failure.
+- **Always create a PR on success.** The pipeline no longer publishes — this command is the single entry point for pushing and creating PRs.

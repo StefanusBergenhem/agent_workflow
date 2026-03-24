@@ -29,7 +29,7 @@ You are the Pipeline Controller. You are a thin state machine executor. You read
 idle → creating_sprint_branch → computing_stages → planning_worktrees →
   executing_stage → stage_complete →
     [more stages?] → planning_worktrees (next stage)
-    [all done?] → retrospective → publishing → idle
+    [all done?] → e2e_validation → retrospective → idle
 ```
 
 Within `executing_stage` (parallel per task):
@@ -51,8 +51,8 @@ build → review → APPROVED → merge to sprint branch, mark completed
 | `planning_worktrees` | Creating git worktrees for all tasks in the current stage. | See [GIT_OPERATIONS.md](GIT_OPERATIONS.md). |
 | `executing_stage` | Tasks in the current stage are building/reviewing in parallel worktrees. | Monitor task progress. |
 | `stage_complete` | All tasks in stage are completed or escalated. | Check for next stage or retrospective. |
+| `e2e_validation` | Running end-to-end tests on the merged sprint branch. | Run e2e tests; on failure, deploy fix cycle. |
 | `retrospective` | Running sprint retrospective analysis. | Spawn retrospective sub-agent. |
-| `publishing` | Pushing sprint branch and creating pull request. | See [GIT_OPERATIONS.md](GIT_OPERATIONS.md). |
 | `escalated` | Critical halt requiring human intervention. | Human intervention required. |
 
 ### Schemas
@@ -77,7 +77,7 @@ Key fields: `current_phase`, `sprint_branch`, `stages.definitions`, `task_states
    - Otherwise → transition to `computing_stages` (sprint exists, stages not yet computed).
    - Update `pipeline_state.yaml` with the new phase and a `reason: "Resumed mid-sprint"` history entry.
 3. If `sprint.yaml` does not exist → HALT. Tell the user to run `/wf-command-swa` to produce `sprint.yaml`.
-4. If all tasks are complete → transition to `retrospective` (sprint done, retrospective pending).
+4. If all tasks are complete → transition to `e2e_validation` (sprint done, e2e gate pending).
 
 **Metrics initialization:** If `config.observability.enabled` is true (default), create `.workflow/metrics/` directory if needed and initialize `.workflow/metrics/sprint-<sprint-id>.yaml` with sprint metadata and model config. If resuming mid-sprint and the metrics file already exists, do not overwrite. See `skills/wf-skill-observability/SKILL.md` for the initialization schema.
 
@@ -184,7 +184,7 @@ When a stage reaches `stage_complete`:
 5. **Record stage metrics:** If `config.observability.enabled`, record `completed_at` and compute `duration_seconds` for this stage in `.workflow/metrics/sprint-<sprint-id>.yaml → stages.durations.<N>`.
 6. **Check for next stage:**
    - If `stages.current < stages.total`: increment `stages.current`, transition to `planning_worktrees`.
-   - If all stages complete: transition to `retrospective`.
+   - If all stages complete: transition to `e2e_validation`.
 
 ---
 
@@ -223,9 +223,80 @@ After `stage_complete`, before proceeding to `planning_worktrees` for the next s
 
 ---
 
+## E2E Validation Phase
+
+When all stages are complete (or all remaining tasks are blocked/escalated), transition to `e2e_validation`:
+
+1. **Check if `commands.test_e2e` is configured.** If the command is empty or not set, skip e2e validation and transition directly to `retrospective`.
+
+2. **Run e2e tests on the sprint branch:**
+   ```bash
+   git checkout ${SPRINT_BRANCH}
+   ${commands.test_e2e} > /tmp/pipeline-${sprint_id}-e2e.log 2>&1
+   ```
+   Read the log file for the result.
+
+3. **On pass:** Transition to `retrospective`.
+
+4. **On fail:** Deploy a build/review fix cycle to address the e2e failure:
+
+   a. **Create a fix worktree** from the sprint branch:
+      ```bash
+      git worktree add "${WORKTREE_BASE}/e2e-fix-${sprint_id}" -b e2e-fix-${sprint_id} origin/${SPRINT_BRANCH}
+      ```
+
+   b. **Write a synthetic task contract** to `.workflow/current_task.yaml` in the worktree:
+      ```yaml
+      task_id: "E2E-FIX"
+      title: "Fix e2e test failures on sprint branch"
+      type: "fix"
+      acceptance_criteria:
+        - "All e2e tests pass: ${commands.test_e2e}"
+      files_to_touch: []          # Build agent determines affected files from the failure log
+      context_to_load: []         # Build agent reads the e2e failure log for context
+      ```
+
+   c. **Write `.workflow/feedback.yaml`** in the worktree with the e2e failure details:
+      ```yaml
+      verdict: "REJECTED"
+      source: "e2e_validation"
+      attempt: <current_attempt>
+      failures:
+        - type: "e2e_test_failure"
+          description: "E2E tests failed on merged sprint branch"
+          log_file: "/tmp/pipeline-${sprint_id}-e2e.log"
+          details: "<last 50 lines of the log>"
+      required_fixes:
+        - "Analyse the e2e failure log and fix the root cause"
+        - "Ensure all e2e tests pass after the fix"
+      ```
+
+   d. **Dispatch build sub-agent** (fix mode — `feedback.yaml` is present). Use the same context envelope as a normal build dispatch.
+
+   e. **On build completion, dispatch review sub-agent.**
+
+   f. **On review APPROVED:** Merge the fix branch to the sprint branch (same merge protocol as normal tasks). Re-run e2e tests (go back to step 2).
+
+   g. **On review REJECTED:** Increment attempt counter. If `attempt_counter < max_attempts` (from `review.max_attempts` in config), re-dispatch build in fix mode (step d). If `attempt_counter >= max_attempts`, escalate to human and proceed to `retrospective` anyway.
+
+   h. **On DESIGN_ISSUE:** Escalate to human. Proceed to `retrospective` anyway.
+
+5. **Track e2e fix attempts** in `pipeline_state.yaml` under `e2e_validation`:
+   ```yaml
+   e2e_validation:
+     status: "fixing"          # passed | fixing | escalated
+     attempt_counter: 1
+     fix_branch: "e2e-fix-S1"
+     worktree_path: ".claude/worktrees/e2e-fix-S1"
+   ```
+
+6. **Clean up the e2e fix worktree** after the fix cycle completes (pass or escalation).
+
+---
+
 ## Retrospective Phase
 
-When all stages are complete (or all remaining tasks are blocked/escalated):
+When e2e validation is complete (passed or escalated):
 
 1. **Finalize metrics:** If `config.observability.enabled`, compute summary aggregates in `.workflow/metrics/sprint-<sprint-id>.yaml` — tasks_planned, tasks_completed, first_attempt_pass_rate, avg_attempts, longest_task, rejection_type_counts. Set `completed_at` and compute `duration_minutes`. See `skills/wf-skill-observability/SKILL.md § Metrics Finalization` for the full computation.
 2. Transition to `retrospective`.
@@ -233,7 +304,13 @@ When all stages are complete (or all remaining tasks are blocked/escalated):
 4. The retrospective skill produces `retrospective/<sprint-id>.md`.
 5. **Append trends:** If `config.observability.enabled`, append a summary entry to `.workflow/metrics/trends.yaml`. Trim to `config.observability.trends.max_sprints` entries if exceeded. See `skills/wf-skill-observability/SKILL.md § Trends Append` for the schema.
 6. **Continuous learning:** If `config.learning.enabled` is true (default), invoke the continuous-learning skill to extract lessons, enforce memory capacity, and archive retrospective documents. If `learning.enabled` is false, skip this step.
-7. On completion, transition to `publishing`. See [GIT_OPERATIONS.md](GIT_OPERATIONS.md) for the publishing protocol.
+7. On completion, transition to `idle`. Report sprint completion summary:
+   - Tasks completed vs planned
+   - Escalated/blocked tasks
+   - Design issues surfaced
+   - E2E validation result (passed, fixed, or escalated)
+   - Link to retrospective report
+   - Instruct the user to run `/wf-command-ship` to validate and push to GitHub.
 
 ---
 
@@ -245,8 +322,9 @@ When all stages are complete (or all remaining tasks are blocked/escalated):
 2. **Review → Build (rejection).** When review produces `feedback.yaml`, increment `attempt_counter` and re-enter build in Fix Mode. Escalate when `attempt_counter >= max_attempts` (read from `review.max_attempts` in config, default: 3).
 3. **Review → Merge (approval).** When review approves, execute merge protocol.
 4. **Stage Complete → Next Stage.** When all tasks resolved, proceed to next stage.
-5. **All Stages Complete → Retrospective.** Automatic, no human gate.
-6. **Retrospective → Publishing.** Automatic, no human gate.
+5. **All Stages Complete → E2E Validation.** Automatic, no human gate.
+6. **E2E Validation → Retrospective.** On pass or after escalation, proceed to retrospective.
+7. **Retrospective → Idle.** Automatic. Pipeline complete. User runs `/wf-command-ship` to push.
 
 ---
 
@@ -265,7 +343,7 @@ When all stages are complete (or all remaining tasks are blocked/escalated):
 | Dependency cycle detected | HALT. Report cycle to human. |
 | `design_issues.yaml` written | Mark task as design_issue. Block dependents. Notify human. |
 | Sprint branch creation fails | HALT. Ask human whether to reuse or rename. |
-| PR creation fails | HALT. Report to human (e.g., `gh` not authenticated). |
+| E2E tests fail after max attempts | Escalate to human. Proceed to retrospective. |
 
 ---
 
@@ -284,4 +362,5 @@ When all stages are complete (or all remaining tasks are blocked/escalated):
 - **Worktree cleanup is mandatory.** Never leave orphaned worktrees.
 - **Retrospective is mandatory.** Every completed sprint gets a retrospective.
 - **Sprint branch is mandatory.** All work happens on a sprint branch, never directly on main.
-- **Publishing is mandatory.** Every sprint must push and create a PR. Pipeline is not done until the PR URL is reported.
+- **E2E validation is mandatory** when `commands.test_e2e` is configured. Skipped (with log message) when not configured.
+- **Pipeline does not push or create PRs.** Publishing is handled by `/wf-command-ship` after the pipeline completes.

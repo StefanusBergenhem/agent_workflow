@@ -30,12 +30,12 @@ You think out loud — showing your reasoning, presenting alternatives, and usin
 Diagrams are **ephemeral conversation tools** for the human. They make architecture visible during the session. They are NEVER written to artifact files — agents consume YAML, humans see diagrams.
 
 **Style guide:**
-- `graph TD` — component dependency graphs (top-down hierarchy)
-- `flowchart LR` — data flows (left-to-right movement)
-- `sequenceDiagram` — interaction sequences between components
-- `graph LR` — sprint dependency chains (left-to-right progression)
+- Use ASCII box-drawing for all diagrams. Wrap in a fenced code block (no language tag).
+- **Component dependency graphs** — top-down layout showing ownership and dependency edges.
+- **Data flows** — left-to-right layout with labeled arrows (`--label-->`).
+- **Sprint dependency chains** — left-to-right layout with grouped boxes per sprint.
 - Max 30 nodes per diagram. For large systems, show the relevant subgraph: components touched by current work (roadmap features or next sprint items) + their immediate neighbors.
-- Use Mermaid styling to highlight issues: `:::warning` for problems, distinct colors for new vs existing components, dashed lines for proposed changes.
+- Use markers to highlight status: `[!]` for warnings/problems, `[*]` for new components. Label health inline as `(healthy)` or `(warning)`.
 
 ---
 
@@ -83,16 +83,23 @@ Run four fitness checks against `COMPONENTS.yaml` (`paths.components` in config)
 
 **Visualize the current system.** Generate a component dependency diagram showing the current architecture. Annotate health issues directly on the diagram:
 
-```mermaid
-graph TD
-    auth[Auth]:::healthy --> db[Database]:::healthy
-    api[API Layer]:::healthy --> auth
-    api --> user[User Service]:::warning
-    user --> db
-    ui[UI]:::healthy --> api
-
-    classDef healthy fill:#2d5016,stroke:#4a8c1c
-    classDef warning fill:#8b6914,stroke:#d4a017
+```
+            +-------------+
+            |     UI      |
+            |  (healthy)  |
+            +------+------+
+                   |
+                   v
+            +-------------+        +-------------+
+            |  API Layer  |------->|    Auth     |
+            |  (healthy)  |        |  (healthy)  |
+            +------+------+        +------+------+
+                   |                      |
+                   v                      v
+            +--------------+       +-------------+
+            | User Service |------>|  Database   |
+            | [!] warning  |       |  (healthy)  |
+            +--------------+       +-------------+
 ```
 
 Mark oversized components, dependency violations, and overlap issues visually.
@@ -123,15 +130,20 @@ For each feature:
 
 Generate a **feature placement diagram** — the existing component graph with the new feature's location highlighted:
 
-```mermaid
-graph TD
-    auth[Auth] --> db[Database]
-    api[API Layer] --> auth
-    api --> user[User Service]
-    api --> notify[Notification ✦ new]:::new
-    notify --> db
-
-    classDef new fill:#1a4a6e,stroke:#2980b9,stroke-width:3px
+```
+            +-------------+        +-------------+
+            |  API Layer  |------->|    Auth     |
+            +--+-------+--+        +------+------+
+               |       |                  |
+               |       v                  v
+               |  +--------------+  +-------------+
+               |  | User Service |  |  Database   |
+               |  +--------------+  +------+------+
+               |                          ^
+               v                          |
+            +-----------------------------+-+
+            | [*] Notification  (new)       |
+            +-------------------------------+
 ```
 
 If component assignment is ambiguous, show both options on separate diagrams.
@@ -154,14 +166,16 @@ Cover these concerns for each feature:
 - **Dependency impact.** Does this introduce new dependencies? Show new edges on the diagram. Do any dependency rules need updating?
 - **Data flow.** How does data move through the system? For non-trivial flows, generate a data flow diagram:
 
-```mermaid
-flowchart LR
-    client[Client] -->|request| api[API]
-    api -->|validate| auth[Auth]
-    auth -->|token| api
-    api -->|query| db[(Database)]
-    db -->|result| api
-    api -->|response| client
+```
+  +--------+  --request-->  +-----+  --validate-->  +------+
+  | Client |                | API |                  | Auth |
+  +--------+  <--response-- +-----+  <--token------  +------+
+                              |  ^
+                        query |  | result
+                              v  |
+                           +----------+
+                           | Database |
+                           +----------+
 ```
 
 - **Risk assessment.** Schema migrations, breaking changes, performance implications.
@@ -244,26 +258,26 @@ sprints:
 
 **Visualize the sprint cut.** Generate a sprint dependency diagram showing groupings, dependency chains, and roadmap tracing:
 
-```mermaid
-graph LR
-    subgraph S1["Sprint 1 — Foundation"]
-        s11["S1.1 Auth middleware\n(E1.F1)"]:::epic1
-        s12["S1.2 Token validation\n(E1.F1)"]:::epic1
-        s13["S1.3 Route setup\n(E2.F1)"]:::epic2
-    end
-
-    subgraph S2["Sprint 2 — Integration"]
-        s21["S2.1 Auth integration\n(E1.F2)"]:::epic1
-        s22["S2.2 API endpoints\n(E2.F2)"]:::epic2
-    end
-
-    s11 --> s12
-    s11 --> s21
-    s13 --> s22
-    s12 --> s21
-
-    classDef epic1 fill:#1a4a6e,stroke:#2980b9
-    classDef epic2 fill:#4a1a6e,stroke:#8029b9
+```
+  +-------------------------------------------+     +-------------------------------+
+  | Sprint 1 — Foundation                     |     | Sprint 2 — Integration        |
+  |                                           |     |                               |
+  |  +---------------------------+            |     |  +-------------------------+  |
+  |  | S1.1 Auth middleware      |--+---------|---->|  | S2.1 Auth integration   |  |
+  |  | (E1.F1)                   |  |         |     |  | (E1.F2)                 |  |
+  |  +---------------------------+  |         |     |  +-------------------------+  |
+  |    |                            |         |     |                               |
+  |    v                            |         |     |                               |
+  |  +---------------------------+  |         |     |                               |
+  |  | S1.2 Token validation     |--+         |     |                               |
+  |  | (E1.F1)                   |            |     |                               |
+  |  +---------------------------+            |     |                               |
+  |                                           |     |                               |
+  |  +---------------------------+            |     |  +-------------------------+  |
+  |  | S1.3 Route setup          |------------|---->|  | S2.2 API endpoints      |  |
+  |  | (E2.F1)                   |            |     |  | (E2.F2)                 |  |
+  |  +---------------------------+            |     |  +-------------------------+  |
+  +-------------------------------------------+     +-------------------------------+
 ```
 
 Explain the ordering rationale: why these sprint boundaries, what the dependency bottlenecks are, how risk is front-loaded.
@@ -311,7 +325,7 @@ These are checks you run to assess architecture health. They inform your decisio
 - **Dependency rules are binding.** Once a dependency rule is established, it cannot be violated — only explicitly amended with justification.
 - **Think out loud.** Every non-obvious decision must show alternatives considered and rationale using the structured reasoning format.
 - **Feature-by-feature.** Do not batch all design decisions into a single wall of text. Work through features individually (or in small obvious clusters).
-- **Diagrams are ephemeral.** Generate Mermaid diagrams during the conversation to aid understanding. Never write diagrams to artifact files.
+- **Diagrams are ephemeral.** Generate ASCII art diagrams during the conversation to aid understanding. Never write diagrams to artifact files.
 
 ---
 
