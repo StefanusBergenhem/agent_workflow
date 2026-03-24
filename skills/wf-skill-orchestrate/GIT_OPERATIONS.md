@@ -43,7 +43,7 @@ Branch naming: `<task_id>-<short-description>`, all lowercase, hyphens only.
 
 After creating the worktree:
 - Write `.workflow/current_task.yaml` (extract the task's contract from sprint.yaml)
-- Run baseline preflight
+- Run baseline preflight (`commands.preflight` from config)
 
 ---
 

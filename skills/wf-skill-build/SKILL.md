@@ -286,14 +286,14 @@ tdd_evidence:
     lint_clean: true
 
 preflight:
-  command: "./scripts/preflight.sh"
+  command: "<commands.preflight from config>"
   result: "PASS"
   log_tail: |
     # Paste last 10 lines of the most relevant /tmp/*.log
     All checks passed.
 
 coverage_metrics:
-  tool: "jest --coverage"           # or "not_configured" if commands.coverage is missing
+  tool: "<commands.coverage from config>"    # or "not_configured" if commands.coverage is missing
   threshold: 90                     # From coverage.threshold in config
   files:
     - file: "src/module/feature.ts"
@@ -315,7 +315,7 @@ test_files_created:
 integration_tests:
   status: "pass"              # "pass" | "fail" | "not_runnable" | "not_applicable"
   warning: ""                 # Non-empty when status is "not_runnable"
-  command: "npm run test:integration"
+  command: "<commands.test_integration from config>"
   log_tail: "<last 20 lines from /tmp/test-integration.log>"
   files_created:
     - "src/module/feature.integration.test.ts"

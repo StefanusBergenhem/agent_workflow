@@ -124,7 +124,7 @@ When in `planning_worktrees`:
    - Read the task contract from `sprint.yaml`
    - Create git worktree — see [GIT_OPERATIONS.md](GIT_OPERATIONS.md) for commands
    - Write `.workflow/current_task.yaml` in each worktree (extract the task's contract from `sprint.yaml` into the standard task contract format)
-   - Run baseline preflight in each worktree
+   - Run baseline preflight (`commands.preflight` from config) in each worktree
 4. Write `.workflow/stage_manifest.yaml` listing all worktrees and contracts.
 5. Update `task_states` with branch and worktree path for each task.
 6. Transition to `executing_stage`.
