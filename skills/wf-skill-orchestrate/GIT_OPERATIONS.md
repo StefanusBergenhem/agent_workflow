@@ -51,28 +51,35 @@ After creating the worktree:
 
 When a task's review is approved:
 
-1. **Push the task branch:**
-   ```bash
-   cd <worktree_path>
-   git push origin <branch>
-   ```
-
-2. **Merge to sprint branch** (not main):
+1. **Merge to sprint branch** (not main):
    ```bash
    SPRINT_BRANCH=<sprint_branch from pipeline_state.yaml>
    git checkout ${SPRINT_BRANCH}
-   git pull origin ${SPRINT_BRANCH}
    git merge <branch> --no-ff
    ```
 
-3. **On conflict:** Abort (`git merge --abort`), mark task as `merge_conflict`, escalate to human. Do NOT auto-resolve or force merge.
+2. **On conflict:** Abort (`git merge --abort`), mark task as `merge_conflict`, escalate to human. Do NOT auto-resolve or force merge.
 
-4. **On success:**
+3. **On success:**
    ```bash
-   git push origin ${SPRINT_BRANCH}
    git worktree remove <worktree_path>
    ```
    Update `task_states` to `completed`.
+
+> **Note:** Individual task branches are never pushed to GitHub. The sprint branch is pushed once per stage after all merges and post-merge validation — see [Stage Completion Push](#stage-completion-push) below.
+
+---
+
+## Stage Completion Push
+
+After all tasks in a stage are merged and **post-merge validation passes** (preflight + lint on the sprint branch), push the sprint branch:
+
+```bash
+SPRINT_BRANCH=<sprint_branch from pipeline_state.yaml>
+git push origin ${SPRINT_BRANCH}
+```
+
+This is the only mid-pipeline push. It happens once per stage, not per task.
 
 ---
 

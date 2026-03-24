@@ -179,10 +179,11 @@ When a stage reaches `stage_complete`:
    - **Commands used:** top-level `commands` from config (NOT domain-specific overrides). Post-merge validation tests the combined sprint branch across all domains.
    - If either fails: HALT. Report which tests/lint checks broke after merge (these passed in isolation but fail when combined). Escalate to human — this is a cross-task integration issue that cannot be auto-resolved.
    - If both pass: continue.
-3. **Update the stage status** in `pipeline_state.yaml` to `completed`.
-4. **Write stage summary** — follow the Context Hygiene Protocol (see below). Write compact `stage_summaries` entry to `pipeline_state.yaml`.
-5. **Record stage metrics:** If `config.observability.enabled`, record `completed_at` and compute `duration_seconds` for this stage in `.workflow/metrics/sprint-<sprint-id>.yaml → stages.durations.<N>`.
-6. **Check for next stage:**
+3. **Push sprint branch** — see [GIT_OPERATIONS.md § Stage Completion Push](GIT_OPERATIONS.md#stage-completion-push). This is the only mid-pipeline push (once per stage, never per task).
+4. **Update the stage status** in `pipeline_state.yaml` to `completed`.
+5. **Write stage summary** — follow the Context Hygiene Protocol (see below). Write compact `stage_summaries` entry to `pipeline_state.yaml`.
+6. **Record stage metrics:** If `config.observability.enabled`, record `completed_at` and compute `duration_seconds` for this stage in `.workflow/metrics/sprint-<sprint-id>.yaml → stages.durations.<N>`.
+7. **Check for next stage:**
    - If `stages.current < stages.total`: increment `stages.current`, transition to `planning_worktrees`.
    - If all stages complete: transition to `e2e_validation`.
 
