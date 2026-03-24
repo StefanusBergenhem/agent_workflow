@@ -86,10 +86,27 @@ external_skills:
     testing: []           # e.g., ["golang-testing"]
     review: []            # e.g., ["requesting-code-review"]
 
+  # --- Command Override Semantics ---
+  # Top-level `commands:` (above) are the project-wide defaults.
+  # Each domain below can have an optional `commands:` section that
+  # OVERRIDES top-level commands key-by-key for tasks whose
+  # files_to_touch match that domain's `match` globs.
+  #
+  # Only keys you specify in a domain's `commands` are overridden;
+  # unspecified keys keep their top-level values.
+  #
+  # Example: if top-level has `lint: "npx eslint ."` and the backend
+  # domain has `lint: "golangci-lint run"`, a Go task uses golangci-lint
+  # while a frontend task (not matching backend) uses eslint.
+  #
+  # Single-language projects: domain commands are usually unnecessary
+  # since the top-level commands already target the right toolchain.
+  # Multi-language projects: add `commands:` only for domains whose
+  # toolchain differs from the top-level defaults.
+
   domains:
     # Each domain has glob patterns matched against files_to_touch.
     # When a task's files match, domain skills are appended to defaults.
-    # Domain commands override top-level commands for matched tasks.
     # If files span multiple domains, all matching domain skills are loaded;
     # commands use the domain with the most file matches (ties: first alphabetically).
     #
@@ -98,15 +115,18 @@ external_skills:
     #   skills:
     #     implementation: ["golang-patterns"]
     #     testing: ["golang-testing"]
-    #   commands:                          # Optional: override top-level commands
-    #     test_unit: "go test ./..."
+    #   commands:                          # Only keys that DIFFER from top-level
+    #     test_unit: "go test ./..."       # Overrides top-level test_unit
     #     test_integration: "go test -tags=integration ./..."
-    #     lint: "golangci-lint run"
+    #     lint: "golangci-lint run"        # Overrides top-level lint
+    #     # type_check, coverage, etc. inherit from top-level
     # frontend:
     #   match: ["frontend/**", "**/*.tsx", "**/*.ts", "src/components/**"]
     #   skills:
     #     implementation: ["frontend-patterns"]
     #     testing: ["vitest"]
-    #   commands:
-    #     test_unit: "npx vitest run"
-    #     lint: "npx eslint ."
+    #   commands:                          # Only keys that DIFFER from top-level
+    #     test_unit: "npx vitest run"      # Overrides top-level test_unit
+    #     lint: "npx eslint ."             # Overrides top-level lint
+    #     type_check: "tsc --noEmit"       # Overrides top-level type_check
+    #     # test_integration, coverage, etc. inherit from top-level

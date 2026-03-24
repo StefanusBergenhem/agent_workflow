@@ -98,20 +98,61 @@ Based on the language and framework detection from Step 2, pre-populate `externa
 
 **Multi-language projects** (e.g., both `go.mod` and `package.json` detected): Create separate domain entries for each language, using directory structure to infer path patterns. Scan the project tree for language-specific directories (e.g., `cmd/`, `internal/`, `pkg/` for Go; `src/`, `frontend/`, `app/` for TypeScript/React).
 
-**Single-language projects:** Create one domain entry. The `defaults` section may be sufficient — note this to the user.
+**Single-language projects:** Create one domain entry. The `defaults` section may be sufficient — note this to the user. Do NOT add domain `commands` since top-level commands already target the right toolchain.
 
-**Suggest installed skills:** For each detected domain, check `~/.claude/skills/` for matching skills and suggest them. Example output:
+**Suggest installed skills:** For each detected domain, check `~/.claude/skills/` for matching skills and suggest them.
+
+**Auto-populate domain commands (multi-language only):** For each detected domain in a multi-language project, add a `commands` section with language-appropriate commands that DIFFER from the top-level defaults set in Step 3. Only include keys where the domain's toolchain produces a different command than top-level.
+
+Language-to-command reference:
+
+| Language   | test_unit                      | lint                | type_check     | test_integration                  | coverage                                 |
+|------------|--------------------------------|---------------------|----------------|-----------------------------------|------------------------------------------|
+| Go         | `go test ./...`                | `golangci-lint run` | —              | `go test -tags=integration ./...` | `go test -coverprofile=coverage.out ./...`|
+| TypeScript | `npx vitest run` or `npm test` | `npx eslint .`      | `tsc --noEmit` | —                                 | `npx vitest run --coverage`              |
+| Python     | `pytest`                       | `ruff check .`      | `mypy .`       | —                                 | `pytest --cov`                           |
+| Rust       | `cargo test`                   | `cargo clippy`      | —              | —                                 | —                                        |
+
+For TypeScript, prefer `npx vitest run` if `vitest` is in `package.json` devDependencies; otherwise `npm test`.
+
+**Domain command logic:**
+1. Identify the primary language (used for top-level `commands` in Step 3).
+2. For each non-primary domain, compare its language commands against top-level. Only add keys where the value differs.
+3. Skip domain `commands` entirely if the domain's language matches the primary language.
+
+Example output (multi-language Go + TypeScript project where Go is primary):
 ```
-Detected: go, typescript (react + vite)
+Detected: go (primary), typescript (react + vite)
 
 Installed skills that match your stack:
   Go:         golang-patterns, golang-testing
   TypeScript: frontend-patterns, vitest
   General:    tdd, requesting-code-review
 
+Domain commands auto-detected:
+  backend:  Go toolchain — matches top-level, no command overrides needed
+  frontend: 3 command overrides added (test_unit, lint, type_check)
+    test_unit:  "npx vitest run"
+    lint:       "npx eslint ."
+    type_check: "tsc --noEmit"
+
 Suggested external_skills config added to .workflow/config.yaml.
 Review and adjust match patterns for your directory structure.
-Tip: Add 'commands:' to each domain for domain-specific test/lint commands.
+Review auto-detected domain commands — adjust if your project uses different runners.
+```
+
+Example output (single-language project):
+```
+Detected: go (single language)
+
+Installed skills that match your stack:
+  Go:      golang-patterns, golang-testing
+  General: tdd, requesting-code-review
+
+Single-language project — top-level commands already use your toolchain.
+Domain command overrides not needed.
+
+Suggested external_skills config added to .workflow/config.yaml.
 ```
 
 ### 10. CI Alignment Check
@@ -359,6 +400,18 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
   - Move `implementation`, `testing`, `review` values into `defaults` (wrap scalar values in lists)
   - Move `frontend` and `backend` values into `domains` entries with appropriate `match` patterns (infer from project structure)
   - Report: "Migrated external_skills from flat format to defaults/domains structure. Review the `match` patterns in `domains` to ensure they cover the right files."
+- **Action (domains without commands):** If `external_skills.domains` exists and has entries with `skills` but no `commands` section:
+  1. Detect the project's languages using the same heuristics as Step 2 (scan for `go.mod`, `package.json`, `pyproject.toml`, `Cargo.toml`, etc.)
+  2. Identify the primary language by checking which language the top-level `commands` target (e.g., if `commands.test_unit` is `go test ./...`, primary is Go)
+  3. For each domain entry without `commands`, infer the domain's language from its `match` globs:
+     - Globs containing `*.go`, `cmd/**`, `internal/**`, `pkg/**` → Go
+     - Globs containing `*.ts`, `*.tsx`, `*.js`, `*.jsx`, `frontend/**`, `src/components/**` → TypeScript
+     - Globs containing `*.py`, `*.pyi` → Python
+     - Globs containing `*.rs` → Rust
+  4. Compare the inferred domain language commands against the top-level `commands` in config (use the language-to-command reference table from Step 9)
+  5. If any domain command would differ from top-level, add a `commands` section to that domain with only the differing keys
+  6. **Guard:** Do NOT overwrite existing `commands` sections. Skip domains whose inferred language matches the primary language (commands would be redundant). Skip if all domains match the primary language.
+  7. Report: "Added domain commands to N domains based on detected languages. Review: [list domains with their new commands]." If no commands added: "All domains use the same toolchain as top-level commands — no domain command overrides needed."
 
 #### Check 14 — Missing task_sizing section
 
