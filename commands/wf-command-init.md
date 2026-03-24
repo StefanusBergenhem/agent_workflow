@@ -77,6 +77,7 @@ Create empty starter files:
 - `docs/MEMORY.yaml` — from `templates/memory.yaml.tmpl` (structured lessons store)
 - `docs/STATE.md` — from `templates/state.md.tmpl` (infrastructure facts and known issues)
 - `docs/CONVENTIONS.md` — from `templates/conventions.md.tmpl` (code style and patterns)
+- `TARGET_ARCHITECTURE.md` — from `templates/target-architecture.md.tmpl` (target end-state vision)
 - `docs/adrs/` — create empty directory for Architecture Decision Records
 
 ### 7. Generate starter CLAUDE.md (if none exists)
@@ -139,7 +140,7 @@ After the pipeline completes, run /wf-command-ship on the host to:
 Print a summary of what was created and detected. Suggest next steps:
 - Review and customize `.workflow/config.yaml`
 - Run `/wf-command-strategist` to create a product roadmap
-- Run `/wf-command-sa` to define components and master backlog
+- Run `/wf-command-sa` to define components, master backlog, and target architecture
 - Run `/wf-command-swa` to detail the first sprint
 - Run `/wf-command-pipeline` to execute the sprint
 - Run `/wf-command-ship` on the host to validate and push
@@ -166,6 +167,8 @@ Based on agent findings, produce initial `COMPONENTS.yaml`:
 - `depends_on` derived from import graph
 - `exposes` derived from exported symbols
 - `constraints` set to defaults (max 20 files, max 15 exports) — flag if already exceeded
+
+Note: Deep init does NOT generate `TARGET_ARCHITECTURE.md` content — it captures the *current* state, not the target state. The template is scaffolded in Step 6 (standard init). Run `/wf-command-sa` in roadmap mode to create the target architecture.
 
 ### Step D3 — Enhance `COMPONENTS.yaml` with summary fields
 
@@ -268,6 +271,7 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
 
 - **Detect:** Any of these keys are missing from `paths:` in `.workflow/config.yaml`:
   - `roadmap` (default: `"roadmap.yaml"`)
+  - `target_architecture` (default: `"TARGET_ARCHITECTURE.md"`)
   - `sprint` (default: `"sprint.yaml"`)
   - `state` (default: `"docs/STATE.md"`)
   - `memory` (default: `"docs/MEMORY.yaml"`)
@@ -403,6 +407,13 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
   Action: Review and remove or rename. No automatic changes applied.
   ```
   Do NOT auto-remove. If any unknown fields overlap with Check 17's deprecated list, note that they are already flagged as deprecated.
+
+#### Check 19 — Missing TARGET_ARCHITECTURE.md scaffold
+
+**Why:** The SA and SWA skills reference `paths.target_architecture` for target-state context. Standard init scaffolds this file from a template. If the project was initialized before this feature was added, the file may be missing.
+
+- **Detect:** `TARGET_ARCHITECTURE.md` (or the file at `paths.target_architecture` in config) does not exist
+- **Action:** Scaffold from `templates/target-architecture.md.tmpl`. This creates an empty template — the SA will populate it during a roadmap session.
 
 ---
 

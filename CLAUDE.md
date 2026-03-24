@@ -43,6 +43,7 @@ templates/           # Project bootstrapping templates
   sprint-metrics.yaml.tmpl     # .workflow/metrics/sprint-<id>.yaml schema
   trends.yaml.tmpl             # .workflow/metrics/trends.yaml schema
   memory.yaml.tmpl             # docs/MEMORY.yaml starter (structured lessons)
+  target-architecture.md.tmpl  # TARGET_ARCHITECTURE.md starter (target end-state vision)
   state.md.tmpl                # docs/STATE.md starter (infrastructure facts)
   conventions.md.tmpl          # docs/CONVENTIONS.md starter (code style and patterns)
 
@@ -64,7 +65,7 @@ workflow/            # Legacy DEMS workflow docs (kept for reference)
 ```
 Manual (you decide when):
   /wf-command-strategist  →  roadmap.yaml
-  /wf-command-sa          →  master_backlog.yaml + COMPONENTS.yaml (with summaries)
+  /wf-command-sa          →  master_backlog.yaml + COMPONENTS.yaml (with summaries) + TARGET_ARCHITECTURE.md (roadmap mode)
   /wf-command-swa         →  sprint.yaml (with task contracts)
 
 Automated (runs autonomously via /wf-command-pipeline):
@@ -84,7 +85,7 @@ When creating or modifying skills, consult these two docs:
 
 - **Skills** are SKILL.md files — pure markdown instructions that define a cognitive mode
 - **State files** use YAML (`.workflow/current_task.yaml`, `review_ready.yaml`, `feedback.yaml`, `pipeline_state.yaml`, `metrics/sprint-<id>.yaml`, `metrics/trends.yaml`)
-- **Architecture files** are committed to git: `COMPONENTS.yaml` (with `summary` fields), `master_backlog.yaml`, `sprint.yaml`, `roadmap.yaml`
+- **Architecture files** are committed to git: `COMPONENTS.yaml` (with `summary` fields), `master_backlog.yaml`, `sprint.yaml`, `roadmap.yaml`, `TARGET_ARCHITECTURE.md`
 - **Commands** have YAML frontmatter with a `description` field, then markdown body
 - **Design issues** are written to `design_issues.yaml` when build/review encounter architectural problems that can't be fixed at the code level
 - **Retrospectives** are generated automatically at pipeline end in `retrospective/<sprint-id>.md`, then archived to `retrospective/archive/` after lessons are extracted
@@ -94,6 +95,7 @@ When creating or modifying skills, consult these two docs:
 ## Architecture Governance
 
 - `COMPONENTS.yaml` — component registry with boundaries, constraints, and dependency rules. `COMPONENTS.yaml` includes a `summary` field per component (2-3 sentences covering responsibility and key interfaces), replacing per-module ARCHITECTURE.md files
+- `TARGET_ARCHITECTURE.md` — target end-state vision (narrative, holistic, human-readable). Produced by SA in roadmap mode, consumed by SA/SWA/Strategist as read-only context. Complements COMPONENTS.yaml (current state) and ADRs (individual decisions)
 - The review skill checks architecture compliance as a P0 check
 
 ## Testing Changes

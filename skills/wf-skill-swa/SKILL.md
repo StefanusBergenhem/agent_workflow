@@ -20,6 +20,7 @@ You are the Software Architect. You take the next sprint cut from the master bac
 | Source Code | Component `path` directories | Actual code to understand real interfaces |
 | Config | `.workflow/config.yaml` | Project paths, commands, sizing limits |
 | Memory | `docs/MEMORY.yaml` (`paths.memory` in config, optional) | Past lessons about contract quality and component rules |
+| Target Architecture | `TARGET_ARCHITECTURE.md` (`paths.target_architecture` in config, optional) | Target end-state vision for implementation context |
 
 ---
 
@@ -31,6 +32,7 @@ You are the Software Architect. You take the next sprint cut from the master bac
 2. Find the first sprint with status not `done` — this is the next sprint to detail.
 3. Read all items in that sprint group.
 4. Read `COMPONENTS.yaml` (`paths.components` in config) to understand component boundaries.
+5. Read `TARGET_ARCHITECTURE.md` (`paths.target_architecture` in config) if it exists. Use it as context when writing `implementation_notes` and `acceptance_criteria` — ensure task contracts guide the developer toward the target state, not just toward making tests pass.
 
 ### Step 2 — Source Code Analysis
 
@@ -129,6 +131,7 @@ For each task (including splits), produce a full contract:
 - `implementation_notes` should reference actual code patterns found in the source
 - If a task introduces a new interface or modifies an existing one, `implementation_notes` should note the SOLID consideration (e.g., "Prefer extending the existing Validator interface via composition rather than adding methods to it")
 - If the project has `external_skills.domains` with `commands` entries, note in `implementation_notes` which domain the task is expected to match (e.g., "This task matches the 'backend' domain — commands resolve to Go toolchain"). This helps the developer understand which commands will be used.
+- If `TARGET_ARCHITECTURE.md` exists and the task's component has a corresponding section in the target architecture, include relevant target-state context in `implementation_notes`. Example: "This component will eventually become a standalone service (see TARGET_ARCHITECTURE.md § Architecture Overview). Design the interface to be transport-agnostic."
 
 **Integration test enforcement:**
 - If `files_to_touch` includes files that interact with external dependencies (database, network APIs, filesystem, message queues, caches), `testing_mandate.integration_tests` MUST be non-empty. Scan the source code to detect these interactions — look for DB queries, HTTP clients, file I/O, queue producers/consumers. **Minimum count heuristic:** read `coverage.integration_test_ratio` from config (default: `"per_external_dep"`). When set to `"per_external_dep"`, specify at least one integration test per distinct external system interaction path (e.g., a task that reads from a DB and calls an HTTP API needs at least 2 integration tests).

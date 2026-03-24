@@ -21,6 +21,7 @@ You think out loud — showing your reasoning, presenting alternatives, and usin
 | Components | `COMPONENTS.yaml` (`paths.components` in config) | Current component registry |
 | ADRs | `docs/adrs/*.md` | Architecture Decision Records |
 | Master Backlog | `master_backlog.yaml` (`paths.master_backlog` in config) | Existing backlog to update (roadmap mode) or primary input (ongoing mode) |
+| Target Architecture | `TARGET_ARCHITECTURE.md` (`paths.target_architecture` in config, optional) | Target end-state vision. Read in both modes, produced/updated in roadmap mode. |
 | Config | `.workflow/config.yaml` | Project paths and settings |
 
 ---
@@ -59,11 +60,13 @@ If neither file exists, HALT: suggest running `/wf-command-strategist` to create
 3. Read `COMPONENTS.yaml` (`paths.components` in config) to understand the current system structure.
 4. Read ADRs from `paths.architecture_docs` in config (default: `["docs/adrs/*.md"]`) and any other design documents. If the set is large (>20 files), read titles/headers first and prioritize docs relevant to the components being touched.
 5. Read `master_backlog.yaml` (`paths.master_backlog` in config) if it exists and was not already read in step 2 — check what is already planned or in progress.
+6. Read `TARGET_ARCHITECTURE.md` (`paths.target_architecture` in config) if it exists. This is the target end-state vision. In ongoing mode, it is your primary reference for where the system should be heading. In roadmap mode, you will update it after design decisions are agreed.
 
 If `COMPONENTS.yaml` does not exist, you are working on a new project. Create it from scratch based on the roadmap (or backlog) and any existing source structure.
 
 **Orient the human.** Before diving into analysis, present a brief summary:
 - What exists today (component count, key boundaries, system shape)
+- *If TARGET_ARCHITECTURE.md exists:* Summarize the target vision and note how far the current system is from it (high-level gap assessment)
 - *Roadmap mode:* What the roadmap asks for (features, scale of change)
 - *Ongoing mode:* Current backlog state (completed sprints, next pending sprint, any stale or blocked items)
 - Your initial read on the scope of architectural work needed (minor updates, new components, restructuring)
@@ -80,6 +83,7 @@ Run four fitness checks against `COMPONENTS.yaml` (`paths.components` in config)
 2. **Dependency direction** — flag imports violating `dependency_rules`
 3. **Responsibility overlap** — flag concepts owned by multiple components or owned by none
 4. **Duplication** — flag similar functionality across components (e.g., duplicate retry logic, HTTP clients)
+5. **Current-vs-target gap** — If `TARGET_ARCHITECTURE.md` (`paths.target_architecture` in config) exists, compare the current `COMPONENTS.yaml` against the target vision. Identify: (a) components that exist in the target but not yet in the current system, (b) components that need restructuring to match the target, (c) dependency directions that differ between current and target, (d) decisions in TARGET_ARCHITECTURE.md that have no corresponding implementation or ADR. Present the gap as a prioritized list.
 
 **Visualize the current system.** Generate a component dependency diagram showing the current architecture. Annotate health issues directly on the diagram:
 
@@ -201,6 +205,31 @@ Present findings feature-by-feature (or in small clusters for simple items). Use
 
 **WAIT** for the human to acknowledge before proceeding to planning.
 
+### Phase 3b — Update Target Architecture (Roadmap mode only)
+
+Based on the design decisions agreed in Phase 3, produce or update `TARGET_ARCHITECTURE.md` (`paths.target_architecture` in config).
+
+**If creating from scratch:**
+- Synthesize the product vision from `roadmap.yaml` and the design decisions into a coherent target-state narrative.
+- Include all agreed decisions with their rationale (numbered, with context and alternatives).
+- Describe the target component structure, data architecture, and migration path from current state.
+- Add domain-specific sections as needed (e.g., rule engine, frontend architecture) — the template provides generic sections, but the document should reflect your project's actual architecture.
+
+**If updating:**
+- Incorporate new design decisions into the existing narrative.
+- Update the Migration Path section to reflect current progress (what has been implemented since last update).
+- Move implemented decisions to ADRs if they are significant enough (note this as a suggestion to the human, do not auto-create ADRs).
+
+**Rules:**
+- TARGET_ARCHITECTURE.md is a narrative for humans, not a machine-parseable artifact. Write in clear prose with diagrams where helpful.
+- Reference `COMPONENTS.yaml` component names when discussing architecture to maintain traceability.
+- Reference ADR IDs for decisions that have formal records.
+- The document should be understandable by someone who has not read the roadmap — it stands alone as the architectural vision.
+
+Present the draft to the human for review before writing. This is a collaborative document.
+
+**WAIT** for the human to acknowledge before proceeding to planning.
+
 ### Phase 4 — Plan
 
 #### 4a — Update Architecture Artifacts
@@ -292,6 +321,7 @@ Explain the ordering rationale: why these sprint boundaries, what the dependency
 3. On approval, write:
    - Updated `COMPONENTS.yaml` (`paths.components` in config)
    - `master_backlog.yaml` (`paths.master_backlog` in config)
+   - `TARGET_ARCHITECTURE.md` (`paths.target_architecture` in config) — if roadmap mode and changes were made in Phase 3b
 
 ---
 
@@ -301,6 +331,7 @@ Explain the ordering rationale: why these sprint boundaries, what the dependency
 |:---------|:---------|:------------|
 | Component Registry | `COMPONENTS.yaml` (`paths.components` in config) | Updated component definitions and dependency rules |
 | Master Backlog | `master_backlog.yaml` (`paths.master_backlog` in config) | Ordered technical backlog with sprint groupings |
+| Target Architecture | `TARGET_ARCHITECTURE.md` (`paths.target_architecture` in config) | Target end-state vision (roadmap mode only) |
 
 ---
 
@@ -314,6 +345,7 @@ These are checks you run to assess architecture health. They inform your decisio
 4. **No Orphan Concepts:** Every significant concept in the codebase has an owning component (supports SRP — unowned concepts indicate missing or mis-scoped components)
 5. **Interface Stability:** Components with many dependents should have stable, narrow, focused interfaces — no fat interfaces bundling unrelated operations (Interface Segregation)
 6. **Extension Points:** Components with many dependents should be extensible via interfaces, plugins, or composition without requiring modification of their internals (Open/Closed)
+7. **Target Gap:** If `TARGET_ARCHITECTURE.md` exists, the delta between current system and target vision — missing components, misaligned dependencies, unimplemented decisions (see Phase 2 check 5)
 
 ---
 

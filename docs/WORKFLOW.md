@@ -31,6 +31,7 @@ This creates:
 - `docs/MEMORY.yaml` — structured lessons store
 - `docs/STATE.md` — infrastructure facts and known issues
 - `docs/CONVENTIONS.md` — code style and patterns
+- `TARGET_ARCHITECTURE.md` — target end-state vision (empty template)
 - `docs/adrs/` — directory for Architecture Decision Records
 - `.workflow/` and `retrospective/` added to `.gitignore`
 
@@ -57,7 +58,7 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
 | Role | Command | Input | Output |
 |:-----|:--------|:------|:-------|
 | **Product Strategist** | `/wf-command-strategist` | Conversation, `roadmap.yaml` | `roadmap.yaml` |
-| **Solution Architect** | `/wf-command-sa` | `roadmap.yaml` (optional), `master_backlog.yaml`, `COMPONENTS.yaml` | `master_backlog.yaml`, `COMPONENTS.yaml` (with summaries) |
+| **Solution Architect** | `/wf-command-sa` | `roadmap.yaml` (optional), `master_backlog.yaml`, `COMPONENTS.yaml`, `TARGET_ARCHITECTURE.md` | `master_backlog.yaml`, `COMPONENTS.yaml` (with summaries), `TARGET_ARCHITECTURE.md` (roadmap mode) |
 | **Software Architect** | `/wf-command-swa` | `master_backlog.yaml`, source code | `sprint.yaml` (with task contracts) |
 | **Developer** | (automated) | `sprint.yaml` task contracts | Code + `review_ready.yaml` |
 | **Reviewer** | (automated) | Code diff, task contract | APPROVED / REJECTED / DESIGN_ISSUE |
@@ -67,7 +68,7 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
 
 ```
 /wf-command-strategist  →  roadmap.yaml
-/wf-command-sa          →  master_backlog.yaml + COMPONENTS.yaml (with summaries)
+/wf-command-sa          →  master_backlog.yaml + COMPONENTS.yaml (with summaries) + TARGET_ARCHITECTURE.md (roadmap mode)
 /wf-command-swa         →  sprint.yaml (with task contracts)
 ```
 
@@ -114,6 +115,7 @@ Complete workflow from product strategy through sprint delivery:
   ║  | Design → Plan → Commit   |                                 ║
   ║  +-------------+-------------+                                 ║
   ║                | master_backlog.yaml + COMPONENTS.yaml         ║
+  ║                | + TARGET_ARCHITECTURE.md (roadmap mode)       ║
   ║                v                                               ║
   ║  +---------------------------+                                 ║
   ║  | /wf-command-swa           |                                 ║
@@ -309,15 +311,16 @@ The SA thinks out loud — showing reasoning, presenting alternatives with trade
 
 **How it works (5 phases with interactive checkpoints):**
 
-1. **Ground** — Loads context, orients you on what exists and what needs to happen (roadmap features or backlog state)
-2. **Diagnose** — Runs architecture health checks, shows a component dependency diagram with issues annotated, discusses findings with you before proceeding
+1. **Ground** — Loads context (including TARGET_ARCHITECTURE.md if it exists), orients you on what exists, the target vision, and what needs to happen
+2. **Diagnose** — Runs architecture health checks (including current-vs-target gap analysis), shows a component dependency diagram with issues annotated, discusses findings with you before proceeding
 3. **Design** — *Roadmap mode:* walks through features one at a time with diagrams and design decisions. *Ongoing mode:* reviews components touched by the next sprint for architecture drift, stale items, and new technical decisions needed.
+3b. **Update Target Architecture** (roadmap mode only) — Codifies agreed design decisions into TARGET_ARCHITECTURE.md as a coherent narrative
 4. **Plan** — Updates architecture artifacts, builds/updates the master backlog, shows a sprint cut visualization, discusses sprint boundaries with you
 5. **Commit** — Summarizes decisions, writes artifacts on your approval
 
 Diagrams are ephemeral conversation tools — they help you see the system during the session but are not persisted into files. Agents consume the YAML artifacts.
 
-**Output:** `master_backlog.yaml`, updated `COMPONENTS.yaml` (with `summary` fields per component).
+**Output:** `master_backlog.yaml`, updated `COMPONENTS.yaml` (with `summary` fields per component), `TARGET_ARCHITECTURE.md` (roadmap mode).
 
 ### /wf-command-swa — Software Architecture
 
@@ -401,6 +404,16 @@ dependency_rules:
 ```
 
 `COMPONENTS.yaml` now includes a `summary` field per component (2-3 sentences covering responsibility and key interfaces), replacing per-module ARCHITECTURE.md files.
+
+### TARGET_ARCHITECTURE.md
+
+The target architecture document captures the desired end-state of the system — what it should look like when all planned work is complete. It complements COMPONENTS.yaml (current state) and ADRs (individual decisions).
+
+- **Produced by:** SA skill in roadmap mode (Phase 3b)
+- **Consumed by:** SA (gap analysis in ongoing mode), SWA (contract quality context), Strategist (awareness)
+- **Format:** Human-readable markdown narrative with diagrams, not machine-parseable YAML
+- **Lifecycle:** Updated when the roadmap changes or major design decisions are made. Not updated during sprint execution.
+- **Relationship to ADRs:** Complementary. TARGET_ARCHITECTURE.md is a living, cohesive narrative. ADRs are individual, formal, immutable records. Decisions in TARGET_ARCHITECTURE.md may reference ADRs. Once a target decision is implemented, it should get a corresponding ADR.
 
 ### design_issues.yaml
 
@@ -499,6 +512,7 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 | File | Written by | Read by | Purpose |
 |:-----|:-----------|:--------|:--------|
 | `roadmap.yaml` | `/wf-command-strategist` | SA | Product roadmap with epics and features |
+| `TARGET_ARCHITECTURE.md` | `/wf-command-sa` (roadmap mode) | SA (gap analysis), SWA (contract context), Strategist (awareness) | Target end-state architecture vision |
 | `COMPONENTS.yaml` | `/wf-command-sa` (or `/wf-command-init deep`) | SwA, Build, Review | Component registry and dependency rules |
 | `master_backlog.yaml` | `/wf-command-sa` | SwA | Ordered backlog with sprint groupings |
 | `sprint.yaml` | `/wf-command-swa` | Pipeline | Sprint with full inline task contracts |
@@ -763,7 +777,7 @@ This overrides the global `~/.claude/skills/wf-skill-build/SKILL.md` for this pr
 
 1. `/wf-command-init` (or `/wf-command-init deep` for existing code)
 2. `/wf-command-strategist` — discuss product goals, produce `roadmap.yaml`
-3. `/wf-command-sa` — define architecture, produce `master_backlog.yaml`
+3. `/wf-command-sa` — define architecture, produce `master_backlog.yaml`, `COMPONENTS.yaml`, and `TARGET_ARCHITECTURE.md`
 4. `/wf-command-swa` — detail first sprint, produce `sprint.yaml`
 5. `/wf-command-pipeline` — execute the sprint
 
