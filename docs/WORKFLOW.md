@@ -23,6 +23,8 @@ In any project directory:
 /wf-command-init
 ```
 
+Init acts as an **interactive setup wizard** — it detects your project's language, framework, and dependencies, then walks you through each config section with explanations and smart suggestions. At each checkpoint you can confirm, adjust, or say "skip" to accept all defaults.
+
 This creates:
 - `.workflow/config.yaml` — project settings (language, test commands, paths)
 - `.workflow/pipeline_state.yaml` — pipeline state tracker
@@ -39,15 +41,13 @@ For existing codebases, use deep mode:
 ```
 /wf-command-init deep
 ```
-This additionally generates `COMPONENTS.yaml` with discovered modules (including `summary` fields) and an `architecture_audit.md` report.
+This additionally generates `COMPONENTS.yaml` with discovered modules (including `summary` fields) and an `architecture_audit.md` report. The wizard guides you through component boundary review and audit prioritization.
 
 For repos already using the workflow that need updating after a toolkit change:
 ```
 /wf-command-init migrate
 ```
-This non-destructively scans existing structure, reports what's outdated, and applies targeted upgrades (config sections, directory structure, file format conversions).
-
-Review and customize `.workflow/config.yaml` — especially the `commands` and `paths` sections.
+This non-destructively scans existing structure, reports what's outdated, and applies targeted upgrades. The wizard walks through each new config section before applying, suggests renames for mismatched fields (fuzzy matching against the template schema), and optionally offers a full config review after migration.
 
 ---
 

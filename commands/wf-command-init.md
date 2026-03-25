@@ -13,6 +13,39 @@ Initialize the workflow system for the current project.
 
 ---
 
+## Wizard Behavior (All Modes)
+
+Init operates as an **interactive setup wizard**. At designated checkpoint steps (marked with `[CHECKPOINT]`), pause and engage the user:
+
+1. **Show what was detected/generated** — present the relevant config section or finding
+2. **Explain why it matters** — one sentence on what breaks or degrades if this is wrong
+3. **Suggest improvements** — if empty fields can be inferred from project analysis, propose values with reasoning
+4. **Ask for confirmation** — "Does this look right? Anything to adjust?" before proceeding
+
+### Suggestion Protocol
+
+When suggesting values for empty fields, always show:
+- The detected evidence (e.g., "I see `prisma` in package.json dependencies")
+- The suggested value (e.g., `db_validate: "npx prisma migrate status"`)
+- Why it matters (e.g., "Without this, the pipeline cannot detect stale migrations")
+
+When the user confirms or adjusts, apply immediately and move to the next checkpoint.
+
+### Skip Mechanism
+
+If the user says "skip" or "auto" at any checkpoint, apply defaults silently for all remaining checkpoints in that mode. Do not ask again.
+
+### Checkpoint Batching
+
+To avoid excessive back-and-forth, group related config sections into batches:
+- **Batch 1:** Project identity + paths (Steps 2-3)
+- **Batch 2:** Commands — test, lint, coverage, db (Step 3 continued)
+- **Batch 3:** Tuning — coverage thresholds, task sizing, models, review (Step 3 continued)
+- **Batch 4:** External skills (Step 9)
+- **Batch 5:** CI alignment warnings (Step 10)
+
+---
+
 ## Standard Init Steps
 
 ### 1. Create .workflow/ directory structure
@@ -37,7 +70,7 @@ Scan the project root for:
 
 Record detected language and framework in config.
 
-### 3. Generate .workflow/config.yaml
+### 3. Generate .workflow/config.yaml `[CHECKPOINT]`
 Read `templates/workflow-config.yaml.tmpl` as the canonical source of truth for config structure. Substitute template variables (`{{VAR}}`) with detected values from Step 2:
 
 | Template Variable | Detection Source |
@@ -53,7 +86,59 @@ Read `templates/workflow-config.yaml.tmpl` as the canonical source of truth for 
 | `{{COVERAGE_CMD}}` | Detected or `""` |
 | `{{DB_VALIDATE_CMD}}` | `""` (user fills in) |
 
-Write the substituted result to `.workflow/config.yaml`. The template defines ALL sections (paths, commands, coverage, review, parallel, models, task_sizing, learning, observability, external_skills) — do not add or omit any.
+**Before writing the config file, walk through it with the user in checkpoint batches:**
+
+#### Batch 1 — Project Identity & Paths
+Present the `project:` and `paths:` sections. Explain:
+- "These paths tell every skill where to find architecture files, backlog, sprint data, etc."
+- "The defaults work for most projects. Adjust only if you have an unusual directory structure (e.g., docs live in `documentation/` instead of `docs/`)."
+
+#### Batch 2 — Commands
+Present the `commands:` section. For each field, show detected value or suggest one:
+
+| Field | If detected | If empty |
+|-------|-------------|----------|
+| `test_unit` | "Detected: `<cmd>`. Correct?" | "Could not detect a test runner. What command runs your unit tests?" |
+| `test_integration` | (rarely auto-detected) | Apply Smart Suggestions (see below) |
+| `test_e2e` | (rarely auto-detected) | Apply Smart Suggestions, or: "Leave empty for now if you don't have e2e tests. The pipeline will warn when tasks produce e2e test files it can't run." |
+| `lint` | "Detected: `<cmd>`. Correct?" | "No linter detected. **This is critical** — build and review both require lint. What command runs your linter?" |
+| `type_check` | "Detected: `<cmd>`. Correct?" | Only relevant for typed languages — skip if not applicable |
+| `preflight` | If detected, confirm | "A preflight command runs before every build. Common: `npm run build`, `go vet ./...`. Leave empty if not needed." |
+| `coverage` | If detected, confirm | Apply Smart Suggestions |
+| `db_validate` | (never auto-detected) | Apply Smart Suggestions |
+
+**Smart Suggestions for empty command fields:**
+
+Scan project dependencies (`package.json` dependencies/devDependencies, `go.mod` require, `pyproject.toml` dependencies, `Cargo.toml` [dependencies]) for these patterns:
+
+| Detected Dependency | Field to Suggest | Suggested Value |
+|---|---|---|
+| `prisma` | `db_validate` | `npx prisma migrate status` |
+| `typeorm` | `db_validate` | `npx typeorm migration:show` |
+| `drizzle-orm` | `db_validate` | `npx drizzle-kit check` |
+| `alembic` or `sqlalchemy` | `db_validate` | `alembic check` |
+| `gorm` + migration files | `db_validate` | Suggest user provides path: "GORM detected — what command checks migration status?" |
+| `pg`, `mysql2`, `better-sqlite3` | `test_integration` | "DB driver detected — integration tests should cover DB interactions. Suggest: `<test_unit_cmd> --testPathPattern=integration`" |
+| `vitest` (devDep) | `coverage` | `npx vitest run --coverage` |
+| `jest` (devDep) | `coverage` | `npx jest --coverage` |
+| `cypress` (devDep) | `test_e2e` | `npx cypress run` |
+| `playwright` (devDep) | `test_e2e` | `npx playwright test` |
+| `supertest` or `httptest` | `test_integration` | "HTTP testing library detected — suggest configuring integration test command" |
+
+Present all suggestions together: "Based on your dependencies, I suggest these values for empty fields: [list]. Apply these? You can adjust any."
+
+#### Batch 3 — Tuning Parameters
+Present `coverage:`, `task_sizing:`, `review:`, `parallel:`, and `models:` sections together with brief explanations:
+- "`coverage.threshold: 90` — minimum line coverage for new/modified files. Lower if your project has legacy code without tests."
+- "`task_sizing.max_files_to_touch: 3` — keeps tasks small and reviewable. Increase for broad refactoring sprints."
+- "`task_sizing.max_estimated_lines: 150` — estimated new/changed lines per task. Increase for boilerplate-heavy tasks."
+- "`review.max_attempts: 3` — build/review cycles before escalating to human. 3 is a good default."
+- "`parallel.max_concurrent_tasks: 4` — how many tasks run in parallel during a stage. Lower if your machine is constrained."
+- "`models.*: sonnet` — which AI model handles each pipeline phase. Sonnet is cost-effective for mechanical tasks. Use opus for harder projects."
+
+Ask: "These are sensible defaults. Want to adjust any thresholds?"
+
+Write the confirmed config to `.workflow/config.yaml`. The template defines ALL sections (paths, commands, coverage, review, parallel, models, task_sizing, learning, observability, external_skills) — do not add or omit any.
 
 ### 4. Initialize pipeline state
 Write `.workflow/pipeline_state.yaml`:
@@ -92,7 +177,7 @@ If `CLAUDE.md` already exists, do NOT overwrite it. Report that it exists and su
 ### 8. Create .claude/skills/ directory
 Create `.claude/skills/` for per-project skill overrides. Project-level skills take precedence over global skills.
 
-### 9. External Skills Domain Detection
+### 9. External Skills Domain Detection `[CHECKPOINT]`
 
 Based on the language and framework detection from Step 2, pre-populate `external_skills.domains` with sensible defaults. Check which skills are installed in `~/.claude/skills/` and only reference skills that actually exist.
 
@@ -155,14 +240,32 @@ Domain command overrides not needed.
 Suggested external_skills config added to .workflow/config.yaml.
 ```
 
-### 10. CI Alignment Check
+#### Interactive Review
+After presenting the detected configuration, ask:
+- "Do the `match` patterns cover the right directories for your project?"
+- "Are there installed skills you'd like to add that I didn't suggest?"
+- "For multi-language projects: do the domain command overrides match your actual toolchain?"
 
-After generating the config, check for common gaps and warn the user:
+If there are skills in `~/.claude/skills/` that weren't suggested (because names didn't match detected frameworks), list them: "I also found these installed skills that didn't match a detected framework: [list]. Want to include any of them?"
+
+Apply any adjustments to the config before proceeding.
+
+### 10. CI Alignment Check `[CHECKPOINT]`
+
+After generating the config, check for common gaps and warn the user **with actionable suggestions**:
 
 - **If `commands.test_integration` is empty:** Scan project imports for external dependency indicators (database drivers: `pg`, `mysql`, `prisma`, `sqlalchemy`, `gorm`; HTTP clients: `axios`, `fetch`, `net/http`; message queues: `amqplib`, `kafka`, `nats`; caches: `redis`, `memcached`). If external dependencies are detected, WARN with elevated severity: "External dependencies detected but `commands.test_integration` is not configured. Tasks with external dependencies will create integration test files but the pipeline CANNOT execute them. Tests will be flagged as 'not_runnable' during review. Configure `commands.test_integration` to enable full testing enforcement." If no external dependencies detected, warn normally: "No integration test command configured. Set `commands.test_integration` if your project has integration tests."
 - **If `commands.test_e2e` is empty:** Warn: "No e2e test command configured. Tasks creating user-facing flows will produce e2e test files that cannot be executed. Configure `commands.test_e2e` to enable full e2e testing enforcement."
 - **If `commands.coverage` is empty:** Warn: "No coverage command configured. Without it, the pipeline cannot enforce code coverage thresholds. Set `commands.coverage` (e.g., `npx jest --coverage`)."
 - **If `commands.db_validate` is empty and the project uses a database** (detected via Prisma, SQLAlchemy, TypeORM, GORM, etc.): Warn: "Database detected but `commands.db_validate` is not configured. Set it to catch stale migrations (e.g., `npx prisma migrate status`)."
+
+#### Address CI Gaps Interactively
+After presenting all warnings, for each gap that has a Smart Suggestion (from Step 3, Batch 2), re-offer it:
+- If `test_integration` is empty and DB drivers were detected: "I flagged this earlier — want to set `test_integration` now?"
+- If `coverage` is empty and a test runner was detected: "I can suggest `<coverage_cmd>` based on your test runner."
+- For gaps without suggestions: "I can't suggest a value for `commands.test_e2e`. Do you have an e2e test command, or should we leave it empty for now?"
+
+Apply any accepted suggestions to the config file before continuing.
 
 Explain the Docker/host split:
 ```
@@ -177,9 +280,29 @@ After the pipeline completes, run /wf-command-ship on the host to:
   4. Push the sprint branch to GitHub
 ```
 
-### 11. Report
-Print a summary of what was created and detected. Suggest next steps:
-- Review and customize `.workflow/config.yaml`
+### 11. Report `[CHECKPOINT]`
+
+#### Final Config Review
+Before printing next steps, present a compact one-screen summary of the complete config:
+
+```
+=== Config Summary ===
+  Project:    myapp (typescript)
+  Commands:   test_unit="npx vitest run"  lint="npx eslint ."  type_check="tsc --noEmit"
+              coverage="npx vitest run --coverage"  preflight=""
+              test_integration=(empty)  test_e2e=(empty)  db_validate="npx prisma migrate status"
+  Coverage:   threshold=90%  enforce_new=true  enforce_modified=true
+  Sizing:     max_files=3  max_context=5  max_lines=150
+  Review:     max_attempts=3  escalation=halt
+  Parallel:   enabled=true  max_concurrent=4
+  Models:     build=sonnet  review=sonnet  retrospective=sonnet
+  Skills:     defaults=[]  domains: frontend=[vitest, frontend-patterns]
+  Empty fields: test_integration, test_e2e, preflight (warnings issued above)
+```
+
+Ask: "Final config. Anything to change before we write it?"
+
+Apply any last adjustments, then print what was created and suggest next steps:
 - Run `/wf-command-strategist` to create a product roadmap
 - Run `/wf-command-sa` to define components, master backlog, and target architecture
 - Run `/wf-command-swa` to detail the first sprint
@@ -211,12 +334,27 @@ Based on agent findings, produce initial `COMPONENTS.yaml`:
 
 Note: Deep init does NOT generate `TARGET_ARCHITECTURE.md` content — it captures the *current* state, not the target state. The template is scaffolded in Step 6 (standard init). Run `/wf-command-sa` in roadmap mode to create the target architecture.
 
-### Step D3 — Enhance `COMPONENTS.yaml` with summary fields
+### Step D3 — Enhance `COMPONENTS.yaml` with summary fields `[CHECKPOINT]`
 
 For each detected component, add a `summary` field to its entry in `COMPONENTS.yaml` based on the agent's source code analysis. Each summary should be 2-3 sentences covering:
 - Responsibility (from Agent 2's analysis)
 - Key interfaces (from exported symbols)
 - Ownership boundaries (inferred from imports and responsibility boundaries)
+
+#### Component Boundary Review
+After generating all component entries with summaries, present them as a table:
+
+| Component | Files | Exports | Depends On | Summary (first sentence) | Status |
+|-----------|-------|---------|------------|--------------------------|--------|
+
+For each component:
+- **Flag constraint violations:** "Component `api` has 34 files (limit: 20) and 22 exports (limit: 15). Suggest splitting into `api-routes` and `api-middleware`?"
+- **Flag circular dependencies:** "Components `auth` and `users` depend on each other. Which direction should the dependency flow? Common pattern: `users` depends on `auth`, not the reverse."
+- **Flag overlapping responsibilities:** "Components `utils` and `helpers` both contain string formatting functions. Merge into one?"
+
+Ask: "Do these component boundaries make sense? Should any be merged or split?"
+
+Apply user feedback before writing the final `COMPONENTS.yaml`.
 
 ### Step D4 — Produce Architecture Audit Checklist
 
@@ -247,13 +385,22 @@ Write `architecture_audit.md` in the project root identifying where the existing
 
 This checklist becomes input for the first `/wf-command-sa` session.
 
-### Step D5 — Update config and report
+### Step D5 — Update config and report `[CHECKPOINT]`
 
 - Update `.workflow/config.yaml` with component and audit paths
-- Print summary of findings and suggested next steps:
-  - "Review `COMPONENTS.yaml` — adjust component boundaries and summaries as needed"
-  - "Review `architecture_audit.md` — prioritize cleanup items"
-  - "Run `/wf-command-sa` to create master backlog addressing audit findings"
+
+#### Architecture Audit Prioritization
+After presenting the audit checklist from Step D4, ask:
+- "Which of these issues should go into the first sprint backlog?"
+- "Any findings you disagree with or want to deprioritize?"
+- "Are there known issues not captured here that should be added?"
+
+Record user priorities as annotations in `architecture_audit.md` (e.g., mark items as `[P0]`, `[P1]`, `[SKIP]`).
+
+Print summary of findings and suggested next steps:
+  - "Review `COMPONENTS.yaml` — component boundaries were confirmed during setup"
+  - "Review `architecture_audit.md` — priorities recorded from your input"
+  - "Run `/wf-command-sa` to create master backlog addressing prioritized audit findings"
 
 ---
 
@@ -446,20 +593,46 @@ For each check: evaluate the detection condition, record status as `OK` or `NEED
 **Why:** Fields not present in the template schema are not consumed by any workflow skill. They may be typos, remnants of custom experiments, or fields from a deprecated version. Silently ignoring them creates false expectations that they have an effect. Check 17 catches 3 specific known-deprecated fields; this check catches everything else.
 
 - **Detect:** Parse all dot-separated field paths in `.workflow/config.yaml` (e.g., `commands.test_unit`, `coverage.threshold`, `observability.cost_estimation.token_ratio`). Parse all dot-separated field paths in `templates/workflow-config.yaml.tmpl` (ignoring `{{VAR}}` placeholders — treat them as valid leaf values). Compute the set difference: user config paths minus template paths. **Exclude** any path starting with `external_skills.domains.` — these are user-defined domain entries with user-chosen names and structures. If the difference set is non-empty, report.
-- **Action:** Warn with the full list of unknown fields:
+- **Action:** For each unknown field, compute similarity against all template field paths and present findings interactively with rename/merge suggestions.
+
+  **Matching heuristic:** For each unknown field path, check:
+  1. **Same section + substring overlap:** e.g., `review.retry_count` shares section `review.` with `review.max_attempts` — suggest rename
+  2. **Same leaf name in different section:** e.g., `build.threshold` has leaf `threshold` matching `coverage.threshold` — suggest move
+  3. **Prefix/suffix match:** e.g., `commands.test_backend_integration` contains `test_integration` — suggest rename to `commands.test_integration` or move to domain commands
+  4. **No close match:** report as "No close match" with explanation
+
+  Present interactively:
   ```
   Found N config fields not in the template schema:
-    - commands.test_backend_integration
-    - commands.compile_check
 
-  These fields are not consumed by any workflow skill. They may be:
-    - Typos (check spelling against template fields)
-    - Custom fields for external tooling (safe to keep, but workflow ignores them)
-    - Deprecated fields (see Check 17 for known deprecations)
+    commands.test_backend_integration
+      → Closest match: commands.test_integration
+      → Suggestion: Rename to `commands.test_integration`? The value will be preserved.
+        (If you need per-domain test commands, move this to
+        `external_skills.domains.backend.commands.test_integration` instead.)
 
-  Action: Review and remove or rename. No automatic changes applied.
+    coverage.min_percent
+      → Closest match: coverage.threshold
+      → Suggestion: Rename to `coverage.threshold`? Your value (85) will be preserved.
+
+    review.retry_count
+      → Closest match: review.max_attempts
+      → Suggestion: Rename to `review.max_attempts`? Your value (5) will be preserved.
+
+    commands.compile_check
+      → Known deprecated field (flagged in Check 17)
+      → Suggestion: Remove — no skill reads this field.
+
+    my_custom_field
+      → No close match in template schema
+      → This field is not consumed by any workflow skill. Keep if external tooling reads it, otherwise remove.
   ```
-  Do NOT auto-remove. If any unknown fields overlap with Check 17's deprecated list, note that they are already flagged as deprecated.
+
+  For each field with a suggested match, ask: "Rename `<old>` to `<new>`? (y/n)"
+  For deprecated fields: "Remove `<field>`? (y/keep)"
+  For no-match fields: "Keep `<field>` or remove? (keep/remove)"
+
+  Do NOT auto-rename or auto-remove. Wait for user confirmation on each field. Apply confirmed renames immediately, preserving the original value.
 
 #### Check 19 — Missing TARGET_ARCHITECTURE.md scaffold
 
@@ -500,6 +673,37 @@ Config version: <current> → <target>
   17  Dead config fields       OK               No deprecated fields found
   18  Unknown config fields    NEEDS_MIGRATION  Warn about 2 unknown fields
 
+#### [CHECKPOINT] Migration Plan Review
+Before applying, walk through each new config section being added (Checks 5-7, 13-15). For each:
+- Show the section content (from template)
+- Explain in one sentence what it controls
+- Ask: "Accept defaults, or adjust any values?"
+
+Example:
+```
+Adding `models:` section:
+  build: "sonnet"          — Model for build sub-agents (mechanical task execution)
+  review: "sonnet"         — Model for review sub-agents (checklist validation)
+  retrospective: "sonnet"  — Model for retrospective sub-agents (analysis)
+
+Sonnet is cost-effective for these tasks. Use opus for harder projects.
+Accept these defaults? (y/adjust)
+```
+
+```
+Adding `learning:` section:
+  enabled: true                  — Enable lesson extraction from retrospectives
+  max_memory_entries: 30         — Cap on lessons in memory file (oldest pruned)
+  archive_retrospectives: true   — Move processed retrospectives to archive/
+  archive_metrics: true          — Move processed metrics to archive/
+  cleanup_design_issues: true    — Remove resolved design issues after extraction
+
+These defaults enable the full learning loop. Disable if you want manual control.
+Accept these defaults? (y/adjust)
+```
+
+After walking through all new sections, apply the confirmed migrations:
+
 Applying migrations...
   ✓ Updated config version to 2
   ✓ Converted docs/MEMORY.md → docs/MEMORY.yaml (preserved N lessons, kept .md as backup)
@@ -516,7 +720,7 @@ Applying migrations...
 
 ---
 
-### Step M4 — Verify and summarize
+### Step M4 — Verify and summarize `[CHECKPOINT]`
 
 After all migrations, re-scan to confirm everything is now current. Print final status:
 
@@ -524,7 +728,20 @@ After all migrations, re-scan to confirm everything is now current. Print final 
 === Migration Complete ===
 
 All checks passing. Applied N migrations.
+```
 
+#### Optional Post-Migration Config Walkthrough
+Offer: "Migration complete. Want me to walk through your full config section-by-section to check for improvements?"
+
+If the user accepts, iterate through the same Batch 1-4 checkpoint sequence from Standard Init Step 3, but reading the existing (now-migrated) config instead of generating a new one. Focus on:
+- **Empty command fields** that could be filled based on project dependency analysis (use the Smart Suggestions table from Step 3)
+- **Thresholds** that may need adjustment for the project's maturity (e.g., `coverage.threshold` too high for legacy code)
+- **External skills** that could be added based on installed skills in `~/.claude/skills/`
+- **Task sizing** that may need tuning based on project complexity
+
+If the user declines, skip to the summary.
+
+```
 Next steps:
   - Review .workflow/config.yaml — new sections added with defaults, customize as needed
   - Run install.sh to update skills and commands to latest versions
