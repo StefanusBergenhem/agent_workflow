@@ -71,6 +71,7 @@ Key fields: `current_phase`, `sprint_branch`, `stages.definitions`, `task_states
 
 1. Check if `sprint.yaml` (`paths.sprint` in config) exists.
 2. If `sprint.yaml` exists and contains incomplete tasks (status != `done`):
+   - Check if `current_phase` is `stage_complete` → re-run the design issue gate (Stage Completion step 7). If design issues from the current stage are resolved, proceed to step 8 (next stage or e2e). If still unresolved, HALT again with the same instructions.
    - Check if `sprint_branch` is set in `pipeline_state.yaml` — if not, transition to `creating_sprint_branch`.
    - Check if `.workflow/stage_manifest.yaml` exists → if yes, transition directly to `executing_stage` (worktrees are ready).
    - Check if `stages.definitions` is populated in `pipeline_state.yaml` → if yes, transition to `planning_worktrees`.
@@ -151,7 +152,7 @@ When in `executing_stage`:
 
 7. **On design issue:** When a build or review sub-agent writes to `design_issues.yaml` (`paths.design_issues` in config):
    - Mark the task as `design_issue` in `task_states`
-   - Add entry to `design_issues` in `pipeline_state.yaml`
+   - Add entry to `design_issues` in `pipeline_state.yaml` with `reported_at_stage: <stages.current>`
    - Do NOT retry — the issue is architectural, not code-level
    - Report the design issue to the human
    - Run escalation propagation for blocked dependents
@@ -183,7 +184,10 @@ When a stage reaches `stage_complete`:
 4. **Update the stage status** in `pipeline_state.yaml` to `completed`.
 5. **Write stage summary** — follow the Context Hygiene Protocol (see below). Write compact `stage_summaries` entry to `pipeline_state.yaml`.
 6. **Record stage metrics:** If `config.observability.enabled`, record `completed_at` and compute `duration_seconds` for this stage in `.workflow/metrics/sprint-<sprint-id>.yaml → stages.durations.<N>`.
-7. **Check for next stage:**
+7. **Design issue gate.** Before advancing, check `design_issues` in `pipeline_state.yaml` for entries where `reported_at_stage == stages.current` (i.e., new issues from this stage):
+   - If any exist: HALT. Report all new design issues to the human. Stay in `stage_complete`. Log a history entry with `reason: "Halted: unresolved design issues from stage N"`. Instruct the human: "Resolve design issues in `design_issues.yaml` (`paths.design_issues` in config), then remove the resolved entries from `pipeline_state.yaml → design_issues`, and re-run `/wf-command-pipeline` to resume."
+   - If none (or all design issues are from prior stages that were already reported): proceed to step 8.
+8. **Check for next stage:**
    - If `stages.current < stages.total`: increment `stages.current`, transition to `planning_worktrees`.
    - If all stages complete: transition to `e2e_validation`.
 
@@ -322,10 +326,11 @@ When e2e validation is complete (passed or escalated):
 1. **Build → Review.** When build completes with `review_ready.yaml`, proceed to review.
 2. **Review → Build (rejection).** When review produces `feedback.yaml`, increment `attempt_counter` and re-enter build in Fix Mode. Escalate when `attempt_counter >= max_attempts` (read from `review.max_attempts` in config, default: 3).
 3. **Review → Merge (approval).** When review approves, execute merge protocol.
-4. **Stage Complete → Next Stage.** When all tasks resolved, proceed to next stage.
-5. **All Stages Complete → E2E Validation.** Automatic, no human gate.
-6. **E2E Validation → Retrospective.** On pass or after escalation, proceed to retrospective.
-7. **Retrospective → Idle.** Automatic. Pipeline complete. User runs `/wf-command-ship` to push.
+4. **Stage Complete → Design Issue Gate.** When all tasks resolved, check for unresolved design issues from the current stage. If any exist, HALT and report to human. Pipeline stays in `stage_complete` until human resolves and re-runs.
+5. **Stage Complete → Next Stage.** When the design issue gate passes (no unresolved issues from current stage), proceed to next stage.
+6. **All Stages Complete → E2E Validation.** Automatic, no human gate.
+7. **E2E Validation → Retrospective.** On pass or after escalation, proceed to retrospective.
+8. **Retrospective → Idle.** Automatic. Pipeline complete. User runs `/wf-command-ship` to push.
 
 ---
 
@@ -355,7 +360,7 @@ When e2e validation is complete (passed or escalated):
 - **State is persistent.** All state lives in `pipeline_state.yaml`. The orchestrator is stateless between dispatches.
 - **Automatic gates are mandatory and cannot be overridden.** Error-path escalations (merge conflicts, design issues, max-retry) require human intervention.
 - **Max 3 build-review loops per task.** Escalate on the 4th attempt.
-- **Design issues halt tasks.** Never retry a task with a design issue. Requires architect intervention.
+- **Design issues halt tasks AND the pipeline at stage boundaries.** Never retry a task with a design issue. At stage completion, if any design issues were raised in that stage, the pipeline halts for human resolution before advancing to the next stage. Requires architect intervention.
 - **Append-only history.** Never delete or modify history entries in `pipeline_state.yaml`.
 - **Context hygiene is mandatory.** Sub-agent output goes to /tmp log files, not inline. At stage boundaries, write a compact stage summary and do not reference prior stage details.
 - **No auto-conflict resolution.** Merge conflicts always escalate to the human.

@@ -524,6 +524,7 @@ All workflow state lives in `.workflow/` (gitignored). These files drive the pip
 ```
 idle → creating_sprint_branch → computing_stages → planning_worktrees →
   executing_stage → stage_complete →
+    [design issues from this stage?] → HALT (wait for human resolution)
     [more stages?] → planning_worktrees (next stage)
     [all done?] → e2e_validation → retrospective (+ learning) → idle
 ```
@@ -581,7 +582,7 @@ parallel:
 
 3. **Execution** — All tasks build and review in parallel. Approved tasks merge to the sprint branch immediately.
 
-4. **Stage completion** — When all tasks in a stage are completed, escalated, or halted (design issue), worktrees are cleaned up and the next stage begins.
+4. **Stage completion** — When all tasks in a stage are completed, escalated, or halted (design issue), worktrees are cleaned up. If any design issues were raised during this stage, the pipeline halts for human resolution before advancing. Otherwise, the next stage begins.
 
 5. **E2E Validation** — After all stages, e2e tests run on the merged sprint branch. Failures trigger a build/review fix cycle (max 3 attempts). On pass or escalation, the pipeline proceeds to retrospective.
 
@@ -589,7 +590,7 @@ parallel:
 
 ### Context management
 
-The orchestrator uses a self-compacting strategy to manage context usage across multi-stage sprints. Sub-agent output is piped to `/tmp/pipeline-<sprint_id>-<task_id>.log` files — the orchestrator reads only the verdict, not the full output. At each stage boundary, a compact summary is written to `pipeline_state.yaml` under `stage_summaries`, and prior stage details are not referenced again. This keeps the orchestrator's context window usage manageable even for sprints with many stages.
+The orchestrator uses a self-compacting strategy to manage context usage across multi-stage sprints. Sub-agents write all output artifacts (feedback.yaml, review_ready.yaml, design_issues.yaml) directly to disk in their worktree — the orchestrator reads only the verdict (APPROVED/REJECTED/DESIGN_ISSUE/ESCALATED), never the artifact contents. Sub-agent text output is piped to `/tmp/pipeline-<sprint_id>-<task_id>.log` files. At each stage boundary, a compact summary is written to `pipeline_state.yaml` under `stage_summaries`, and prior stage details are not referenced again. This keeps the orchestrator's context window usage manageable even for sprints with many stages.
 
 ### Merge protocol
 
@@ -856,7 +857,7 @@ git worktree remove <path> --force
 ```
 
 ### Design issue blocks a task
-The task is halted — it cannot be retried. Resolve the design issue via `/wf-command-sa` (architecture change) or `/wf-command-swa` (task re-plan), then re-run the pipeline.
+The task is halted — it cannot be retried. The pipeline also halts at the end of the current stage to give you a chance to resolve the issue before further work proceeds. Resolve the design issue via `/wf-command-sa` (architecture change) or `/wf-command-swa` (task re-plan), remove the resolved entry from `pipeline_state.yaml → design_issues`, then re-run `/wf-command-pipeline` to resume.
 
 ### All tasks in a stage are blocked
 If every task in remaining stages depends on an escalated or design-issue task, the pipeline transitions to `e2e_validation` → `retrospective` → `idle`. Resolve the blocking issue first, then re-run `/wf-command-pipeline`.

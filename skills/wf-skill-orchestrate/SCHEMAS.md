@@ -32,7 +32,7 @@ blocked_tasks:
 
 design_issues:
   # Tasks halted due to design-level problems.
-  # "S1.3": { issue_id: "DI-001", summary: "Auth/DB boundary violation" }
+  # "S1.3": { issue_id: "DI-001", summary: "Auth/DB boundary violation", reported_at_stage: 1 }
 
 stage_summaries:
   # Compact summaries written at stage boundaries (context hygiene).
