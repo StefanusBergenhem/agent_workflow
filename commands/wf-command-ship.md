@@ -107,7 +107,7 @@ gh pr create \
 - **Design issues:** <list or "none">
 
 ## Retrospective
-See `retrospective/<sprint-id>.md` for details.
+See `.workflow/retrospective/<sprint-id>.md` for details.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF

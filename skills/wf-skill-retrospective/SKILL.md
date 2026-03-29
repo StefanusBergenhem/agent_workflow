@@ -115,7 +115,7 @@ Each suggestion must be specific and actionable — not generic advice.
 
 ### Step 4 — Write Retrospective
 
-Write the report to `retrospective/<sprint-id>.md`:
+Write the report to `.workflow/retrospective/<sprint-id>.md` (`paths.retrospective` in config):
 
 ```markdown
 # Sprint <sprint-id> Retrospective
@@ -199,7 +199,7 @@ Write the report to `retrospective/<sprint-id>.md`:
 
 ### Step 5 — Create Retrospective Directory
 
-If `retrospective/` directory doesn't exist, create it.
+If `.workflow/retrospective/` (`paths.retrospective` in config) directory doesn't exist, create it.
 
 ### Step 6 — Apply Continuous Learning Protocol
 
@@ -219,7 +219,7 @@ After writing the retrospective report, load `skills/wf-skill-continuous-learnin
 
 | Artifact | Location | Description |
 |:---------|:---------|:------------|
-| Retrospective Report | `retrospective/<sprint-id>.md` | Structured analysis of sprint execution |
+| Retrospective Report | `.workflow/retrospective/<sprint-id>.md` (`paths.retrospective` in config) | Structured analysis of sprint execution |
 | Updated Memory File | `docs/MEMORY.yaml` (`paths.memory` in config) | Refined lessons extracted from this sprint (via continuous learning protocol) |
 
 ---

@@ -308,7 +308,7 @@ When e2e validation is complete (passed or escalated):
 1. **Finalize metrics:** If `config.observability.enabled`, compute summary aggregates in `.workflow/metrics/sprint-<sprint-id>.yaml` — tasks_planned, tasks_completed, first_attempt_pass_rate, avg_attempts, longest_task, rejection_type_counts. Set `completed_at` and compute `duration_minutes`. See `skills/wf-skill-observability/SKILL.md § Metrics Finalization` for the full computation.
 2. Transition to `retrospective`.
 3. Spawn the retrospective sub-agent with its context envelope (includes metrics files — see [DISPATCH.md](DISPATCH.md)).
-4. The retrospective skill produces `retrospective/<sprint-id>.md`.
+4. The retrospective skill produces `.workflow/retrospective/<sprint-id>.md` (`paths.retrospective` in config).
 5. **Append trends:** If `config.observability.enabled`, append a summary entry to `.workflow/metrics/trends.yaml`. Trim to `config.observability.trends.max_sprints` entries if exceeded. See `skills/wf-skill-observability/SKILL.md § Trends Append` for the schema.
 6. **Continuous learning:** If `config.learning.enabled` is true (default), invoke the continuous-learning skill to extract lessons, enforce memory capacity, and archive retrospective documents. If `learning.enabled` is false, skip this step.
 7. On completion, transition to `idle`. Report sprint completion summary:

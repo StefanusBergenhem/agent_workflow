@@ -35,7 +35,7 @@ This creates:
 - `docs/CONVENTIONS.md` — code style and patterns
 - `TARGET_ARCHITECTURE.md` — target end-state vision (empty template)
 - `docs/adrs/` — directory for Architecture Decision Records
-- `.workflow/` and `retrospective/` added to `.gitignore`
+- `.workflow/` added to `.gitignore` (includes retrospective output)
 
 For existing codebases, use deep mode:
 ```
@@ -62,7 +62,7 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
 | **Software Architect** | `/wf-command-swa` | `master_backlog.yaml`, source code | `sprint.yaml` (with task contracts) |
 | **Developer** | (automated) | `sprint.yaml` task contracts | Code + `review_ready.yaml` |
 | **Reviewer** | (automated) | Code diff, task contract | APPROVED / REJECTED / DESIGN_ISSUE |
-| **Retrospective** | (automated) | Pipeline state, sprint data | `retrospective/<sprint-id>.md` |
+| **Retrospective** | (automated) | Pipeline state, sprint data | `.workflow/retrospective/<sprint-id>.md` |
 
 ### Manual Phases (you decide when)
 
@@ -86,7 +86,7 @@ The workflow uses a **layered role hierarchy**. The top three roles are invoked 
       → halt tasks with design issues → write design_issues.yaml
       → escalate tasks with 3 failures
   → after all stages: run e2e validation (fix cycle if failing)
-  → run retrospective → produce retrospective/<sprint-id>.md
+  → run retrospective → produce .workflow/retrospective/<sprint-id>.md
   → extract lessons into docs/MEMORY.yaml (continuous learning)
   → archive retrospective + metrics to archive directories
   → idle (run /wf-command-ship to push + create PR)
@@ -215,7 +215,7 @@ Complete workflow from product strategy through sprint delivery:
   | Analyse patterns, metrics,   |
   | generate improvements         |
   +---------------+---------------+
-                  | retrospective/<sprint-id>.md
+                  | .workflow/retrospective/<sprint-id>.md
                   v
   +-------------------------------+
   | Continuous Learning           |
@@ -342,7 +342,7 @@ Diagrams are ephemeral conversation tools — they help you see the system durin
 
 **Runs fully autonomously** — no human approval gates during execution.
 
-**Output:** Sprint branch with merged code and `retrospective/<sprint-id>.md`. Run `/wf-command-ship` after to push and create a PR to main.
+**Output:** Sprint branch with merged code and `.workflow/retrospective/<sprint-id>.md`. Run `/wf-command-ship` after to push and create a PR to main.
 
 ### /wf-command-build — TDD Execution
 
@@ -670,7 +670,7 @@ All metrics consumers (retrospective, status) handle the case where metrics file
 At the end of every sprint pipeline run, a retrospective is automatically generated:
 
 ```
-retrospective/<sprint-id>.md
+.workflow/retrospective/<sprint-id>.md
 ```
 
 The retrospective includes:
@@ -694,7 +694,7 @@ After each retrospective, the **continuous learning protocol** automatically clo
 1. **Extract** — Parses the retrospective report's "What Failed" and "Suggested Improvements" sections, plus sprint metrics (component health, rejection patterns), and distils them into structured lessons
 2. **Deduplicate** — Checks each lesson against the existing memory file. If a pattern already exists, it reinforces confidence and adds evidence instead of duplicating
 3. **Enforce capacity** — Memory file is capped at `max_memory_entries` (default 30). Lowest-priority lessons are archived to `.workflow/archive/lessons-archived.yaml`
-4. **Archive** — Moves the retrospective report to `retrospective/archive/` and sprint metrics to `.workflow/archive/metrics/`, so they don't consume context in future runs
+4. **Archive** — Moves the retrospective report to `.workflow/retrospective/archive/` and sprint metrics to `.workflow/archive/metrics/`, so they don't consume context in future runs
 5. **Clean design issues** — Removes resolved entries from `design_issues.yaml`
 
 ### Memory file format
@@ -730,7 +730,7 @@ lessons:
 
 | Source | Archive | Preserved in git? |
 |:-------|:--------|:------------------|
-| `retrospective/<id>.md` | `retrospective/archive/<id>.md` | Yes |
+| `.workflow/retrospective/<id>.md` | `.workflow/retrospective/archive/<id>.md` | No (gitignored) |
 | `.workflow/metrics/sprint-<id>.yaml` | `.workflow/archive/metrics/sprint-<id>.yaml` | No (gitignored) |
 | Pruned lessons | `.workflow/archive/lessons-archived.yaml` | No (gitignored) |
 

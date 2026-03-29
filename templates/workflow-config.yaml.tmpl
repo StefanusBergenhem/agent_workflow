@@ -20,6 +20,7 @@ paths:
   components: "COMPONENTS.yaml"
   master_backlog: "master_backlog.yaml"
   design_issues: "design_issues.yaml"
+  retrospective: ".workflow/retrospective"
 
 commands:
   test_unit: "{{TEST_UNIT_CMD}}"
@@ -59,7 +60,7 @@ task_sizing:
 learning:
   enabled: true                            # Set false to skip lesson extraction and archival
   max_memory_entries: 30                   # Max lessons in the memory file
-  archive_retrospectives: true             # Move retrospective .md to retrospective/archive/
+  archive_retrospectives: true             # Move retrospective .md to paths.retrospective/archive/
   archive_metrics: true                    # Move sprint metrics to .workflow/archive/metrics/
   cleanup_design_issues: true              # Remove resolved design issues after extraction
 

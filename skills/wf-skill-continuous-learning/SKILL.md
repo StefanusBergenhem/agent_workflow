@@ -15,7 +15,7 @@ You are the Learning Extractor. You run at the end of every retrospective. You r
 
 | Input | Location | Purpose |
 |:------|:---------|:--------|
-| Retrospective Report | `retrospective/<sprint-id>.md` | Source of improvement suggestions and failure patterns |
+| Retrospective Report | `.workflow/retrospective/<sprint-id>.md` (`paths.retrospective` in config) | Source of improvement suggestions and failure patterns |
 | Sprint Metrics | `.workflow/metrics/sprint-<sprint-id>.yaml` (optional) | Component health, rejection types, timing data |
 | Design Issues | `design_issues.yaml` (`paths.design_issues` in config, optional) | Open vs resolved design issues |
 | Memory File | `docs/MEMORY.yaml` (`paths.memory` in config) | Current lessons to deduplicate against |
@@ -29,7 +29,7 @@ You are the Learning Extractor. You run at the end of every retrospective. You r
 ### Step 1 — Load Inputs
 
 1. Read `.workflow/pipeline_state.yaml` — extract `sprint_id`.
-2. Read the retrospective report at `retrospective/<sprint-id>.md`.
+2. Read the retrospective report at `.workflow/retrospective/<sprint-id>.md` (`paths.retrospective` in config).
 3. Read `docs/MEMORY.yaml` (`paths.memory` in config). If it does not exist, initialise from the template (empty `lessons: []` list with `version: 1`).
 4. If `.workflow/metrics/sprint-<sprint-id>.yaml` exists, load it for component health and rejection pattern data.
 5. If `design_issues.yaml` (`paths.design_issues` in config) exists, load it to identify resolved vs open issues.
@@ -121,8 +121,8 @@ If the total lesson count (existing + new) exceeds `max_entries`:
 Based on config settings (all default to `true`):
 
 #### If `learning.archive_retrospectives` is true:
-- Create `retrospective/archive/` directory if it doesn't exist
-- Move `retrospective/<sprint-id>.md` to `retrospective/archive/<sprint-id>.md`
+- Create `.workflow/retrospective/archive/` directory if it doesn't exist
+- Move `.workflow/retrospective/<sprint-id>.md` to `.workflow/retrospective/archive/<sprint-id>.md`
 
 #### If `learning.archive_metrics` is true:
 - Create `.workflow/archive/metrics/` directory if it doesn't exist
@@ -183,7 +183,7 @@ lessons:
 | Artifact | Location | Description |
 |:---------|:---------|:------------|
 | Updated Memory File | `docs/MEMORY.yaml` (`paths.memory` in config) | Compact structured lessons |
-| Archived Retrospective | `retrospective/archive/<sprint-id>.md` | Moved from active directory |
+| Archived Retrospective | `.workflow/retrospective/archive/<sprint-id>.md` | Moved from active directory |
 | Archived Metrics | `.workflow/archive/metrics/sprint-<sprint-id>.yaml` | Moved from metrics directory |
 | Cleaned Design Issues | `design_issues.yaml` (`paths.design_issues` in config) | Resolved issues removed |
 | Archived Lessons | `.workflow/archive/lessons-archived.yaml` | Pruned low-priority lessons |
@@ -204,6 +204,6 @@ lessons:
 ## Halt Conditions
 
 Stop and report if:
-- The retrospective report does not exist at `retrospective/<sprint-id>.md`
+- The retrospective report does not exist at `.workflow/retrospective/<sprint-id>.md` (`paths.retrospective` in config)
 - `pipeline_state.yaml` does not exist or has no `sprint_id`
 - The memory file exists but is malformed (not valid YAML, missing `version` or `lessons` keys)

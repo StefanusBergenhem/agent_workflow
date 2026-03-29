@@ -88,7 +88,7 @@ When creating or modifying skills, consult these two docs:
 - **Architecture files** are committed to git: `COMPONENTS.yaml` (with `summary` fields), `master_backlog.yaml`, `sprint.yaml`, `roadmap.yaml`, `TARGET_ARCHITECTURE.md`
 - **Commands** have YAML frontmatter with a `description` field, then markdown body
 - **Design issues** are written to `design_issues.yaml` when build/review encounter architectural problems that can't be fixed at the code level
-- **Retrospectives** are generated automatically at pipeline end in `retrospective/<sprint-id>.md`, then archived to `retrospective/archive/` after lessons are extracted
+- **Retrospectives** are generated automatically at pipeline end in `.workflow/retrospective/<sprint-id>.md` (`paths.retrospective` in config), then archived to `.workflow/retrospective/archive/` after lessons are extracted
 - **Memory file** (`docs/MEMORY.yaml`) stores structured lessons extracted from retrospectives — consumed by build, review, and SWA skills
 - **External skills** are configured in `config.yaml` under `external_skills` with `defaults` (applied to all tasks) and `domains` (matched by file path globs against `files_to_touch`). Skills are merged: defaults + matching domains = union. Build and review skills load the resolved set
 
@@ -124,7 +124,7 @@ Every config field in `templates/workflow-config.yaml.tmpl` must be **read by at
 `commands/wf-command-init.md` must function as a **complete setup wizard**. After running `/wf-command-init` (any mode), the project must be fully ready to run the workflow toolkit with no further manual file creation. This means:
 
 - **Every file referenced by `paths.*` in config** must either be scaffolded by init (from a template) or explicitly detected as already existing. If a skill expects a file at a config path and init doesn't create it, that's a bug.
-- **Every directory the pipeline writes to** (`.workflow/metrics/`, `retrospective/`, `docs/adrs/`, etc.) must be created by init.
+- **Every directory the pipeline writes to** (`.workflow/metrics/`, `.workflow/retrospective/`, `docs/adrs/`, etc.) must be created by init.
 - **All three modes must stay in sync:** standard, deep, and migrate. When a new config section, template, scaffolded file, or directory is added:
   - Standard mode must scaffold it.
   - Deep mode must scaffold it (inherits from standard).
