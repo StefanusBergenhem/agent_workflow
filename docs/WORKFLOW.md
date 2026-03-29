@@ -582,7 +582,7 @@ parallel:
 
 3. **Execution** — All tasks build and review in parallel. Approved tasks merge to the sprint branch immediately.
 
-4. **Stage completion** — When all tasks in a stage are completed, escalated, or halted (design issue), worktrees are cleaned up. If any design issues were raised during this stage, the pipeline halts for human resolution before advancing. Otherwise, the next stage begins.
+4. **Stage completion** — When all tasks in a stage are completed, escalated, or halted (design issue), worktrees are cleaned up. Post-merge validation runs on the sprint branch: unit tests, integration tests, coverage, and lint. If any check fails, the pipeline halts — this is a cross-task integration issue. If any design issues were raised during this stage, the pipeline halts for human resolution before advancing. Otherwise, the next stage begins.
 
 5. **E2E Validation** — After all stages, e2e tests run on the merged sprint branch. Failures trigger a build/review fix cycle (max 3 attempts). On pass or escalation, the pipeline proceeds to retrospective.
 

@@ -72,7 +72,7 @@ When a task's review is approved:
 
 ## Stage Completion Push
 
-After all tasks in a stage are merged and **post-merge validation passes** (preflight + lint on the sprint branch), push the sprint branch:
+After all tasks in a stage are merged and **post-merge validation passes** (unit tests + integration tests + coverage + lint on the sprint branch), push the sprint branch:
 
 ```bash
 SPRINT_BRANCH=<sprint_branch from pipeline_state.yaml>

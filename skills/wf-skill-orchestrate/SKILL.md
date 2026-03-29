@@ -175,11 +175,13 @@ When a stage reaches `stage_complete`:
 
 1. **Clean up worktrees** — see [GIT_OPERATIONS.md](GIT_OPERATIONS.md).
 2. **Post-merge validation.** After all approved tasks in the stage have merged to the sprint branch, run validation on the merged result:
-   - Run `commands.test_unit` (if configured) on the sprint branch. Pipe output to `/tmp/pipeline-postmerge-stage-<N>.log 2>&1`.
+   - Run `commands.test_unit` (if configured) on the sprint branch. Pipe output to `/tmp/pipeline-postmerge-unit-<N>.log 2>&1`.
+   - Run `commands.test_integration` (if configured) on the sprint branch. Pipe output to `/tmp/pipeline-postmerge-integration-<N>.log 2>&1`.
+   - Run `commands.coverage` (if configured) on the sprint branch. Pipe output to `/tmp/pipeline-postmerge-coverage-<N>.log 2>&1`. Parse the output and verify that files modified in this stage's diff meet `coverage.threshold` (from config, default 90%).
    - Run `commands.lint` (if configured) on the sprint branch. Pipe output to `/tmp/pipeline-postmerge-lint-<N>.log 2>&1`.
    - **Commands used:** top-level `commands` from config (NOT domain-specific overrides). Post-merge validation tests the combined sprint branch across all domains.
-   - If either fails: HALT. Report which tests/lint checks broke after merge (these passed in isolation but fail when combined). Escalate to human — this is a cross-task integration issue that cannot be auto-resolved.
-   - If both pass: continue.
+   - If any check fails: HALT. Report which tests/lint/coverage checks broke after merge (these passed in isolation but fail when combined). Escalate to human — this is a cross-task integration issue that cannot be auto-resolved.
+   - If all pass: continue.
 3. **Push sprint branch** — see [GIT_OPERATIONS.md § Stage Completion Push](GIT_OPERATIONS.md#stage-completion-push). This is the only mid-pipeline push (once per stage, never per task).
 4. **Update the stage status** in `pipeline_state.yaml` to `completed`.
 5. **Write stage summary** — follow the Context Hygiene Protocol (see below). Write compact `stage_summaries` entry to `pipeline_state.yaml`.
