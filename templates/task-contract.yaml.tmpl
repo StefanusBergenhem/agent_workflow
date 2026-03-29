@@ -40,11 +40,20 @@ depends_on: []
 
 # ---- Testing Mandate ----
 # Specifies exactly what tests must be written and what they must cover.
+# For single-target tasks, use the flat format (description + covers).
+# For multi-target tasks (2+ functions/files), use the grouped format
+# so each target's coverage is independently auditable.
 testing_mandate:
   # Unit tests — no external dependencies (DB, network, filesystem).
   unit_tests:
+    # Flat format (single target):
     - description: ""
       covers: ""  # Which acceptance criterion this test validates.
+    # Grouped format (multi-target — use when tests span 2+ functions/files):
+    # - target: "file.go:functionName"
+    #   tests:
+    #     - description: ""
+    #       covers: ""
 
   # Integration tests — real dependencies, tagged appropriately.
   integration_tests:

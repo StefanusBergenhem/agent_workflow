@@ -133,6 +133,33 @@ For each task (including splits), produce a full contract:
 - If the project has `external_skills.domains` with `commands` entries, note in `implementation_notes` which domain the task is expected to match (e.g., "This task matches the 'backend' domain — commands resolve to Go toolchain"). This helps the developer understand which commands will be used.
 - If `TARGET_ARCHITECTURE.md` exists and the task's component has a corresponding section in the target architecture, include relevant target-state context in `implementation_notes`. Example: "This component will eventually become a standalone service (see TARGET_ARCHITECTURE.md § Architecture Overview). Design the interface to be transport-agnostic."
 
+**Grouped testing mandate (multi-target tasks):**
+- When a task's `testing_mandate` spans multiple functions or files (e.g., two related functions in the same file, or tests across two files), group test cases by `target` instead of using a flat list. This makes missing items structurally visible — a flat list of 8 tests across 2 functions hides gaps; grouped sections make each function's coverage independently auditable.
+- Use the grouped format whenever a task touches **2+ distinct functions/methods that each need their own test cases**. The flat format remains valid for single-target tasks.
+- Grouped format example:
+  ```yaml
+  testing_mandate:
+    unit_tests:
+      - target: "handlers/door.go:autoValidate"
+        tests:
+          - description: "returns (0, error) when ListRequirements fails [negative]"
+            covers: "AC-2"
+          - description: "returns (count, nil) on success [positive]"
+            covers: "AC-1"
+      - target: "handlers/door.go:autoValidateImported"
+        tests:
+          - description: "returns error when ListPropertyDefinitions fails [negative]"
+            covers: "AC-2"
+          - description: "returns (count, nil) on success [positive]"
+            covers: "AC-1"
+  ```
+- **Self-check:** after writing grouped mandates, verify every target has at least one positive and one negative test case. If a target has only positive cases, add error-path coverage.
+
+**Migration and schema-change contracts:**
+- For tasks involving database migrations (column add/drop/alter), `acceptance_criteria` MUST explicitly state the target schema for **both** up and down migrations, including: column type, nullability, and default value. Example: `"Up migration drops column property_metadata"`, `"Down migration re-creates property_metadata as JSONB NULL DEFAULT '{}'"`.
+- `implementation_notes` MUST include the exact SQL column definition for the down migration so the developer restores the previous schema faithfully. Do not leave the down migration definition implicit or "derivable from context."
+- `testing_mandate.integration_tests` for migration tasks MUST include assertions on column properties post-migration: at minimum, column existence, data type, and `is_nullable`. Example: `"After down migration: column property_metadata exists, type is jsonb, is_nullable is YES"`.
+
 **Integration test enforcement:**
 - If `files_to_touch` includes files that interact with external dependencies (database, network APIs, filesystem, message queues, caches), `testing_mandate.integration_tests` MUST be non-empty. Scan the source code to detect these interactions — look for DB queries, HTTP clients, file I/O, queue producers/consumers. **Minimum count heuristic:** read `coverage.integration_test_ratio` from config (default: `"per_external_dep"`). When set to `"per_external_dep"`, specify at least one integration test per distinct external system interaction path (e.g., a task that reads from a DB and calls an HTTP API needs at least 2 integration tests).
 - If a task creates new public endpoints or service interfaces, integration tests covering the interface round-trip are required.
@@ -201,6 +228,14 @@ For each task, determine which other tasks in the sprint must complete before it
 - If A creates `src/auth/types.ts` and B imports from it, B depends on A — even if B also modifies other files
 - Keep the graph as shallow as possible — avoid unnecessary chains. If A and B are truly independent, leave `depends_on: []` so they run in parallel
 - Detect cycles — if you find a circular dependency, split one of the tasks to break it
+
+**Atomic type dependency detection:**
+- When a task **narrows, removes, or renames** a type member (TypeScript union member, Go enum value, struct field, interface method), scan for all consumers of that type across the codebase. If consumers exist in files outside the task's `files_to_touch`, those consumer updates MUST be either:
+  1. Included in the same task (request a sizing waiver if this exceeds `max_files_to_touch`), OR
+  2. Placed in a task that `depends_on` the type-change task — **but only if the type-change task leaves the codebase in a compilable state** (e.g., the type is widened first, then consumers migrate, then the type is narrowed).
+- **If neither option preserves compilability at every stage boundary, merge the type change and all its consumers into a single task.** A sizing waiver is preferable to a broken intermediate state. Document the waiver reason in `implementation_notes`.
+- Common triggers to watch for: removing a member from a union/enum type, dropping a field from a struct/interface, narrowing a type parameter. These almost always have compile-time consumers that cannot be split across stages.
+- If the consumer count makes a single task impractical (e.g., 10+ files), flag as a design issue — the type boundary may need refactoring (e.g., introduce an adapter layer) before the removal can proceed safely.
 
 The orchestrator will use `depends_on` to compute parallel execution stages via topological sort. Tasks with no dependencies run first (Stage 1), tasks depending only on Stage 1 tasks run next (Stage 2), etc. Getting this wrong means either: tasks fail because a dependency wasn't built yet, or tasks wait unnecessarily because a false dependency serializes them.
 
