@@ -6,8 +6,7 @@ set -euo pipefail
 # Safe to run multiple times (idempotent).
 #
 # All artifacts are copied (not symlinked) so ~/.claude/ is fully
-# self-contained — no runtime dependency on this repo. This matters
-# for Docker containers that mount ~/.claude/ but not this repo.
+# self-contained — no runtime dependency on this repo.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"

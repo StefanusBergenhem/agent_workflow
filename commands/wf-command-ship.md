@@ -1,9 +1,9 @@
 ---
 name: wf-command-ship
-description: "Host-side validation gate. Runs full test suite (unit + integration + e2e + coverage + DB validation) and pushes to GitHub on success. Run this on the host after the pipeline completes in Docker."
+description: "Validation gate. Runs full test suite (unit + integration + e2e + coverage + DB validation) and pushes to GitHub on success."
 ---
 
-Ship the sprint branch after full validation. This command runs on the **host machine** (not in Docker) where infrastructure (database, services) and GitHub access are available.
+Ship the sprint branch after full validation.
 
 ## Prerequisites
 

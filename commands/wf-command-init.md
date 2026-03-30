@@ -266,13 +266,9 @@ After presenting all warnings, for each gap that has a Smart Suggestion (from St
 
 Apply any accepted suggestions to the config file before continuing.
 
-Explain the Docker/host split:
+Explain the validation flow:
 ```
-Note: The automated pipeline (/wf-command-pipeline) runs unit tests and lint
-inside its environment. Integration tests, e2e tests, and DB validation
-require infrastructure that may not be available during pipeline execution.
-
-After the pipeline completes, run /wf-command-ship on the host to:
+Note: After the pipeline completes, run /wf-command-ship to:
   1. Run the full test suite (unit + integration + e2e)
   2. Verify code coverage meets thresholds
   3. Validate database state
