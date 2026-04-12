@@ -333,6 +333,11 @@ Diagrams are ephemeral conversation tools — they help you see the system durin
 - Are acceptance criteria clear and testable?
 - Are component boundaries respected?
 - Are there design issues flagged?
+- Do ACs listing 3+ items have per-item test assertions (not generic "renders all")?
+- Do ACs specifying data-fetching patterns explicitly prohibit alternatives (e.g., useQuery vs prop-drilling)?
+- Do defensive code branches have corresponding `[negative]`/`[boundary]` test items?
+- Are integration tests tagged `[integration-only]` when they require live dependencies?
+- Do new files have per-file coverage thresholds in the testing mandate?
 
 **Output:** `sprint.yaml` with inline task contracts, optionally `design_issues.yaml`.
 
@@ -358,7 +363,7 @@ Diagrams are ephemeral conversation tools — they help you see the system durin
 
 **Design issue detection:** If the developer discovers an architectural problem during implementation (wrong boundary, missing interface, impossible constraint), they write to `design_issues.yaml` and halt — no retries.
 
-**Output:** Code changes + `.workflow/review_ready.yaml`.
+**Output:** Committed code changes + `.workflow/review_ready.yaml`. The build agent commits before writing `review_ready.yaml` — a claim without a commit is incomplete. Fix mode also ends with a commit (`<step_id> fix: <reason>`).
 
 ### /wf-command-review — QA Validation
 
@@ -373,7 +378,7 @@ Diagrams are ephemeral conversation tools — they help you see the system durin
 
 **Architecture compliance:** Verifies modified files belong to the correct component per `COMPONENTS.yaml`, checks import directions against `dependency_rules`, validates component summaries.
 
-**On approval:** Pushes the branch, merges to the sprint branch, cleans up the worktree.
+**On approval:** Commits state updates (sprint.yaml status, STATE.md), then reports to the orchestrator. The orchestrator handles merge to the sprint branch and per-stage push (see GIT_OPERATIONS.md). Review uses `git merge-base` for local diff resolution — never `origin/` refs, which may not exist until the sprint branch is pushed.
 
 **On rejection:** Writes `.workflow/feedback.yaml` with specific failures. Build re-runs in fix mode. Max 3 attempts.
 

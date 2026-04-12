@@ -247,14 +247,19 @@ Run the preflight command (`commands.preflight` from config). All checks must pa
 
 ---
 
-## Step 7 — Stage and Handoff
+## Step 7 — Commit and Handoff
 
-Stage all modified files listed in `files_to_touch`:
+Stage and commit all modified files listed in `files_to_touch`:
 ```bash
 git add <files listed in files_to_touch>
+git commit -m "<step_id> <title>
+
+<2-3 line summary of what changed and why>"
 ```
 
-Do NOT commit or push — the Reviewer commits and pushes on approval.
+A `review_ready.yaml` without a preceding commit is incomplete — the merge protocol requires committed changes on the task branch.
+
+Do NOT push — the orchestrator pushes per-stage after merge.
 
 Then write `.workflow/review_ready.yaml`:
 
@@ -342,8 +347,14 @@ doc_updates_applied:
    - Do NOT address issues not listed in the feedback
 4. **Design issue check:** If the fix reveals an architectural problem (same criteria as Step 3b), write a design issue and HALT instead of continuing to fail.
 5. Re-run the full verification checklist from [skills/wf-skill-verification/SKILL.md](../wf-skill-verification/SKILL.md) (Step 6) and preflight.
-6. Overwrite `.workflow/review_ready.yaml` with updated results.
-7. Re-stage modified files.
+6. Stage and commit the fix:
+   ```bash
+   git add <files listed in files_to_touch>
+   git commit -m "<step_id> fix: <failure type summary>
+
+   <what was fixed and why>"
+   ```
+7. Overwrite `.workflow/review_ready.yaml` with updated results.
 
 **Fix Mode constraints:**
 - Treat each feedback failure as a targeted fix, not a rewrite

@@ -41,7 +41,7 @@ Before starting the QA checklist, check if `review_ready.yaml` has `status: desi
 Read in this exact order:
 1. `.workflow/current_task.yaml` — the contract (what was required)
 2. `.workflow/review_ready.yaml` — the claim (what the Developer says was done)
-3. Run `git diff origin/main` — the actual changes (ground truth)
+3. Run `git diff $(git merge-base HEAD main)..HEAD` — the actual changes (ground truth). Use `merge-base` to resolve the correct base commit locally — do NOT use `origin/` refs, which may not exist until the sprint branch is pushed.
 4. [skills/wf-skill-verification/SKILL.md](../wf-skill-verification/SKILL.md) — the canonical completion checklist. This is mandatory, not optional. Several QA checks below reference it.
 5. Memory file — check for known rule violations and past mistakes
 6. Conventions file(s) — the coding standards the implementation must follow
@@ -84,7 +84,7 @@ Several checks below reference the **Verification Checklist** (loaded in Step 1,
 | # | Check | What to verify | Fail Action |
 |:--|:------|:---------------|:------------|
 | 0.1 | **Security scan** | Scan the diff for: SQL injection (string concatenation in queries), XSS (`dangerouslySetInnerHTML`, raw DOM insertion), hardcoded credentials/secrets, auth bypass (endpoints without auth middleware), input validation gaps (missing type/length/enum checks), secret exposure in error messages | REJECT with `security_violation` |
-| 0.2 | **Scope audit** | Execute Verification Checklist §3 (Scope Compliance) independently. Compare `git diff --name-only origin/main` against `files_to_touch`. Do not trust the builder's scope claim. | REJECT with `scope_violation` |
+| 0.2 | **Scope audit** | Execute Verification Checklist §3 (Scope Compliance) independently. Compare `git diff --name-only $(git merge-base HEAD main)..HEAD` against `files_to_touch`. Do not trust the builder's scope claim. | REJECT with `scope_violation` |
 | 0.3 | **Acceptance criteria** | Re-read each criterion in `acceptance_criteria`. For each one, find the specific code or test in the diff that satisfies it. If any criterion is not demonstrably met, reject. | REJECT with `acceptance_criteria_unmet` |
 | 0.4 | **Architecture compliance** | Check that modified files belong to the correct component per `COMPONENTS.yaml` (`paths.components` in config). Verify the task's component owns the concepts being implemented per the component's `summary` and `owns` fields in `COMPONENTS.yaml`. Check that any new imports respect `dependency_rules`. | REJECT with `architecture_violation` or write design issue |
 
@@ -170,19 +170,16 @@ Execute the approval workflow:
    - Delete `.workflow/review_ready.yaml`
    - Delete `.workflow/feedback.yaml` (if present)
 
-6. **Commit all staged files:**
+6. **Commit state updates** (sprint.yaml status, STATE.md, MEMORY.yaml — if any were modified):
    ```bash
-   git commit -m "<step_id> <title>
+   git add <modified state files>
+   git commit -m "<step_id> review: approved
 
-   <2-3 line summary of what changed and why>"
+   Mark task done, update state files."
    ```
+   Note: The build agent has already committed the code changes. This commit captures only the reviewer's state updates. Do NOT push — the orchestrator pushes per-stage after merge (see GIT_OPERATIONS.md § Stage Completion Push).
 
-7. **Push the branch:**
-   ```bash
-   git push origin <branch-name>
-   ```
-
-8. **Report to human.** Inform the human the branch is pushed and ready for merge.
+7. **Report to orchestrator.** The task branch is ready for merge to the sprint branch.
 
 ---
 

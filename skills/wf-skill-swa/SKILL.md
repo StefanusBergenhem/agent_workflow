@@ -170,6 +170,21 @@ For each task (including splits), produce a full contract:
   - External dependencies in `files_to_touch` but `integration_tests` empty without justification → error, go back and add integration test cases or a justification.
   - User-facing flows in `files_to_touch` but `e2e_tests` empty without justification → error, go back and add e2e test cases or a justification.
 
+**Data-fetching pattern disambiguation:**
+- When an acceptance criterion specifies HOW a component obtains data (e.g., "fetched via useQuery", "loaded from context", "received as prop"), the contract MUST explicitly state the prohibited alternatives. Example: if AC says "Field dropdown populated from property_definitions (fetched via useQuery)", add to `implementation_notes`: "Component must own its own useQuery call for property_definitions. Do NOT accept property_definitions as a prop from the parent." Without this, the build agent will default to whichever pattern is most common in the codebase (typically prop-drilling), ignoring the AC's intent.
+
+**Per-field test assertions for enumerated ACs:**
+- When an acceptance criterion lists 3 or more discrete items (fields, columns, menu entries, tabs, etc.), the `testing_mandate` MUST include one test assertion per item — not a single generic "renders all fields" assertion. A single bullet conceals omission risk; discrete assertions make each item independently auditable. Example: if AC says "Form renders: name, description, category, severity, domain, tags", the testing_mandate needs 6 discrete test items, not one "renders all metadata fields" item.
+
+**Integration test environment tagging:**
+- Integration tests that require a live external dependency (database, message queue, external API) MUST be tagged `[integration-only]` in the `testing_mandate`. This tells the build agent: "create this test, but it only runs when the dependency is available — do not count it in the unit test pass/fail decision." Without this tag, the build agent either skips the test silently (causing reviewer rejection) or fails trying to run it without the dependency.
+
+**Defensive branch test coverage:**
+- Any acceptance criterion or implementation that includes defensive code paths (unknown value handlers, fallback rendering, error boundaries, default switch cases) MUST have a corresponding `[negative]` or `[boundary]` test item in `testing_mandate`. The build agent reliably covers happy paths but skips defensive branches unless explicitly mandated. Self-check: after writing the contract, scan each file in `files_to_touch` for switch defaults, else branches handling "unknown"/"other" values, and fallback renders — each one needs a test item.
+
+**Per-file coverage thresholds:**
+- When the project has a global coverage threshold (e.g., `coverage.threshold: 90`), the `testing_mandate` for tasks creating new files MUST state the threshold per new file. Example: "ConditionBuilder.tsx must reach 90% branch coverage." The global threshold is an aggregate — a single untested new file can pass the aggregate while having 40% coverage itself. Per-file thresholds make the requirement unambiguous at build time.
+
 ### Step 4 — Validate Component Boundaries
 
 For each task contract:
